@@ -1,0 +1,3322 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <title>ShadowDrop Messenger</title>
+  <meta name="theme-color" content="#090b12" />
+  <meta name="description" content="Закрытый QR-мессенджер для телефона и ПК с обменом текстом, кодом, фото, видео и файлами." />
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-database-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-storage-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js"></script>
+
+  <style>
+    :root{
+      --bg-0:#05060a;
+      --bg-1:#070913;
+      --bg-2:#0c1020;
+      --bg-3:#10172a;
+      --card:rgba(14,18,31,.72);
+      --card-strong:rgba(14,18,31,.88);
+      --stroke:rgba(255,255,255,.09);
+      --stroke-2:rgba(255,255,255,.14);
+      --text:#edf1fb;
+      --muted:#9aa5bb;
+      --muted-2:#6f7b91;
+      --accent:#8b5cf6;
+      --accent-2:#22d3ee;
+      --accent-3:#f43f5e;
+      --ok:#34d399;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --shadow:0 28px 100px rgba(0,0,0,.54);
+      --radius:28px;
+      --radius-2:22px;
+      --radius-3:18px;
+      --blur:18px;
+      --nav-h:72px;
+      --sidebar-w:360px;
+      --msg-w:min(780px,86%);
+      --speed:.18s;
+      --speed-2:.3s;
+      --speed-3:.55s;
+      --ease:cubic-bezier(.2,.8,.2,1);
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      color:var(--text);
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(139,92,246,.22), transparent 20%),
+        radial-gradient(circle at 82% 16%, rgba(34,211,238,.14), transparent 22%),
+        radial-gradient(circle at 50% 110%, rgba(244,63,94,.08), transparent 28%),
+        linear-gradient(180deg, #05060a 0%, #070913 48%, #04050a 100%);
+      overflow-x:hidden;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+
+    /* background mesh */
+    .mesh{
+      position:fixed;inset:0;pointer-events:none;opacity:.2;z-index:0;
+      background-image:
+        linear-gradient(rgba(255,255,255,.05) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(255,255,255,.05) 1px, transparent 1px);
+      background-size:74px 74px;
+      mask-image:radial-gradient(circle at center, black 18%, transparent 76%);
+      animation:meshMove 30s linear infinite;
+    }
+
+    @keyframes meshMove{
+      from{transform:translateY(0)}
+      to{transform:translateY(74px)}
+    }
+
+    .blobs{
+      position:fixed; inset:0; pointer-events:none; overflow:hidden; z-index:0;
+      filter:blur(1px);
+    }
+
+    .blob{
+      position:absolute; width:420px; height:420px; border-radius:999px;
+      background:radial-gradient(circle at 30% 30%, rgba(139,92,246,.35), rgba(139,92,246,.08) 45%, transparent 72%);
+      animation:blobFloat 26s ease-in-out infinite;
+      opacity:.55;
+    }
+    .blob.b2{
+      width:520px;height:520px;
+      background:radial-gradient(circle at 32% 34%, rgba(34,211,238,.22), rgba(34,211,238,.06) 45%, transparent 72%);
+      animation-duration:32s;
+      animation-delay:-8s;
+    }
+    .blob.b3{
+      width:360px;height:360px;
+      background:radial-gradient(circle at 34% 34%, rgba(244,63,94,.12), rgba(244,63,94,.05) 45%, transparent 72%);
+      animation-duration:28s;
+      animation-delay:-14s;
+    }
+
+    @keyframes blobFloat{
+      0%{transform:translate3d(-10vw, -4vh, 0) scale(1)}
+      25%{transform:translate3d(28vw, 9vh, 0) scale(1.08)}
+      50%{transform:translate3d(54vw, -8vh, 0) scale(.96)}
+      75%{transform:translate3d(18vw, 18vh, 0) scale(1.1)}
+      100%{transform:translate3d(-10vw, -4vh, 0) scale(1)}
+    }
+
+    .dots{
+      position:fixed; inset:0; pointer-events:none; z-index:0;
+      background-image: radial-gradient(circle at 1px 1px, rgba(255,255,255,.06) 1px, transparent 0);
+      background-size: 28px 28px;
+      mask-image: radial-gradient(circle at center, black 18%, transparent 82%);
+      opacity:.24;
+    }
+
+    .shell{
+      position:relative; z-index:1;
+      min-height:100%;
+      display:flex;
+      flex-direction:column;
+    }
+
+    .topbar{
+      position:sticky; top:0; z-index:30;
+      height:var(--nav-h);
+      display:flex; align-items:center; justify-content:space-between; gap:14px;
+      padding:12px 16px;
+      background:linear-gradient(180deg, rgba(8,10,16,.92), rgba(8,10,16,.66));
+      border-bottom:1px solid rgba(255,255,255,.07);
+      backdrop-filter:blur(18px);
+    }
+
+    .brand{
+      display:flex; align-items:center; gap:12px; min-width:0;
+    }
+
+    .mark{
+      width:42px;height:42px;border-radius:14px;
+      background:
+        linear-gradient(135deg, rgba(139,92,246,.96), rgba(34,211,238,.9));
+      display:grid;place-items:center;
+      box-shadow:0 10px 25px rgba(139,92,246,.2);
+      position:relative; overflow:hidden;
+      flex:none;
+    }
+
+    .mark::before{
+      content:"";
+      position:absolute; inset:-30%;
+      background:linear-gradient(120deg, transparent, rgba(255,255,255,.32), transparent);
+      transform:rotate(25deg) translateX(-120%);
+      animation:shine 3.8s ease-in-out infinite;
+    }
+
+    @keyframes shine{
+      0%,40%{transform:rotate(25deg) translateX(-120%)}
+      70%,100%{transform:rotate(25deg) translateX(120%)}
+    }
+
+    .mark svg{position:relative; z-index:1}
+
+    .brand-text{
+      display:grid; gap:2px; min-width:0;
+    }
+
+    .brand-text strong{
+      font-size:15px; line-height:1.1; letter-spacing:.2px;
+    }
+
+    .brand-text span{
+      font-size:12px; color:var(--muted);
+      white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+    }
+
+    .top-actions{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+      justify-content:flex-end;
+    }
+
+    .btn{
+      appearance:none;border:none;cursor:pointer;
+      display:inline-flex; align-items:center; justify-content:center; gap:9px;
+      min-height:44px;
+      padding:0 16px;
+      color:var(--text);
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:16px;
+      text-decoration:none;
+      user-select:none;
+      transition:
+        transform var(--speed) var(--ease),
+        background var(--speed) var(--ease),
+        border-color var(--speed) var(--ease),
+        box-shadow var(--speed) var(--ease),
+        opacity var(--speed) var(--ease);
+      box-shadow:0 10px 25px rgba(0,0,0,.14);
+    }
+
+    .btn:hover{
+      transform:translateY(-1px);
+      border-color:rgba(255,255,255,.14);
+      background:rgba(255,255,255,.06);
+    }
+
+    .btn:active{
+      transform:translateY(0);
+    }
+
+    .btn:disabled{
+      opacity:.45;
+      cursor:not-allowed;
+      transform:none;
+    }
+
+    .btn.primary{
+      background:linear-gradient(135deg, rgba(139,92,246,1), rgba(34,211,238,.9));
+      border-color:transparent;
+      color:#07101a;
+      font-weight:800;
+      box-shadow:0 14px 32px rgba(139,92,246,.26);
+    }
+
+    .btn.primary:hover{box-shadow:0 18px 38px rgba(139,92,246,.34)}
+
+    .btn.good{
+      background:rgba(52,211,153,.08);
+      border-color:rgba(52,211,153,.22);
+    }
+
+    .btn.warn{
+      background:rgba(245,158,11,.08);
+      border-color:rgba(245,158,11,.22);
+    }
+
+    .btn.bad{
+      background:rgba(239,68,68,.08);
+      border-color:rgba(239,68,68,.22);
+    }
+
+    .btn.icon{
+      padding:0;
+      width:44px;
+    }
+
+    .page{
+      width:min(1560px,100%);
+      margin:0 auto;
+      padding:16px;
+      display:grid;
+      gap:16px;
+      flex:1;
+    }
+
+    .hero{
+      display:grid;
+      grid-template-columns:1.2fr .8fr;
+      gap:16px;
+      align-items:stretch;
+    }
+
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.018));
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:var(--radius);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(var(--blur));
+      overflow:hidden;
+      position:relative;
+    }
+
+    .panel::after{
+      content:"";
+      position:absolute; inset:0;
+      border-radius:inherit;
+      pointer-events:none;
+      background:linear-gradient(180deg, rgba(255,255,255,.05), transparent 14%, transparent 82%, rgba(255,255,255,.04));
+      opacity:.35;
+      mix-blend-mode:screen;
+    }
+
+    .hero-copy{
+      padding:26px;
+      display:grid;
+      gap:18px;
+    }
+
+    .eyebrow{
+      display:inline-flex;
+      width:max-content;
+      gap:8px;
+      align-items:center;
+      padding:8px 12px;
+      border-radius:999px;
+      background:rgba(139,92,246,.13);
+      border:1px solid rgba(139,92,246,.22);
+      color:#eadfff;
+      font-weight:700;
+      letter-spacing:.3px;
+      font-size:12px;
+      text-transform:uppercase;
+    }
+
+    .hero-title{
+      margin:0;
+      font-size:clamp(34px,5.4vw,64px);
+      line-height:1.02;
+      letter-spacing:-.04em;
+      max-width:12ch;
+    }
+
+    .hero-desc{
+      margin:0;
+      color:var(--muted);
+      font-size:clamp(15px,1.45vw,18px);
+      line-height:1.7;
+      max-width:68ch;
+    }
+
+    .hero-points{
+      display:flex;
+      flex-wrap:wrap;
+      gap:10px;
+    }
+
+    .pill{
+      display:inline-flex; align-items:center; gap:8px;
+      padding:9px 12px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      color:#dfe6f4;
+      font-size:13px;
+    }
+
+    .hero-cta{
+      display:flex; flex-wrap:wrap; gap:10px;
+    }
+
+    .stats{
+      padding:18px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+
+    .stat-grid{
+      display:grid;
+      grid-template-columns:repeat(2,minmax(0,1fr));
+      gap:12px;
+    }
+
+    .stat{
+      padding:14px;
+      border-radius:22px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      display:grid; gap:8px;
+      min-height:98px;
+    }
+
+    .stat .k{
+      color:var(--muted);
+      font-size:12px;
+      letter-spacing:.3px;
+      text-transform:uppercase;
+    }
+
+    .stat .v{
+      font-size:24px;
+      font-weight:900;
+      letter-spacing:-.03em;
+      line-height:1.1;
+    }
+
+    .stat .s{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+    }
+
+    .status{
+      display:flex; align-items:center; gap:10px;
+      font-size:13px; color:var(--muted);
+      padding:14px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:22px;
+    }
+
+    .led{
+      width:10px; height:10px; border-radius:999px;
+      background:var(--warn);
+      box-shadow:0 0 0 4px rgba(245,158,11,.12);
+      flex:none;
+    }
+
+    .status.ok .led{background:var(--ok); box-shadow:0 0 0 4px rgba(52,211,153,.12)}
+    .status.bad .led{background:var(--bad); box-shadow:0 0 0 4px rgba(239,68,68,.12)}
+    .status.good .led{background:var(--accent-2); box-shadow:0 0 0 4px rgba(34,211,238,.12)}
+
+    .workspace{
+      display:grid;
+      grid-template-columns:var(--sidebar-w) minmax(0,1fr);
+      gap:16px;
+      align-items:start;
+    }
+
+    .sidebar{
+      padding:16px;
+      display:grid;
+      gap:12px;
+      align-content:start;
+    }
+
+    .chat{
+      padding:16px;
+      display:grid;
+      gap:12px;
+      min-height:calc(100vh - var(--nav-h) - 48px);
+    }
+
+    .card{
+      padding:14px;
+      background:rgba(255,255,255,.035);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:24px;
+      position:relative;
+      overflow:hidden;
+    }
+
+    .card h2,
+    .card h3,
+    .card h4{
+      margin:0;
+    }
+
+    .section-title{
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:10px;
+      margin-bottom:12px;
+    }
+
+    .section-title h2{
+      font-size:18px;
+      letter-spacing:-.02em;
+    }
+
+    .badge{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      padding:7px 10px;
+      border-radius:999px;
+      background:rgba(34,211,238,.09);
+      border:1px solid rgba(34,211,238,.18);
+      color:#d3f7ff;
+      font-size:12px;
+      white-space:nowrap;
+    }
+
+    .field{
+      display:grid;
+      gap:7px;
+    }
+
+    .field + .field{margin-top:12px}
+
+    label{
+      font-size:13px;
+      color:#d8e0ee;
+      display:flex;
+      align-items:center;
+      gap:8px;
+    }
+
+    .input,
+    textarea,
+    select{
+      width:100%;
+      color:var(--text);
+      background:rgba(7,9,14,.84);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:13px 14px;
+      outline:none;
+      transition:border-color var(--speed) var(--ease), box-shadow var(--speed) var(--ease), transform var(--speed) var(--ease);
+    }
+
+    .input::placeholder,
+    textarea::placeholder{
+      color:#77839b;
+    }
+
+    .input:focus,
+    textarea:focus,
+    select:focus{
+      border-color:rgba(139,92,246,.5);
+      box-shadow:0 0 0 4px rgba(139,92,246,.12);
+    }
+
+    textarea{
+      min-height:118px;
+      resize:vertical;
+      line-height:1.55;
+    }
+
+    .textarea-tight{
+      min-height:86px;
+    }
+
+    .row{
+      display:flex;
+      gap:10px;
+      flex-wrap:wrap;
+    }
+
+    .row > *{flex:none}
+
+    .dropzone{
+      border:1.5px dashed rgba(255,255,255,.14);
+      border-radius:24px;
+      padding:16px;
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.05));
+      color:var(--muted);
+      text-align:center;
+      line-height:1.55;
+      transition:border-color var(--speed) var(--ease), transform var(--speed) var(--ease), background var(--speed) var(--ease);
+    }
+
+    .dropzone.drag{
+      border-color:rgba(34,211,238,.5);
+      background:rgba(34,211,238,.06);
+      transform:scale(1.01);
+    }
+
+    .mini-list{
+      display:grid;
+      gap:10px;
+    }
+
+    .file-item{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:10px;
+      padding:12px 13px;
+      border-radius:18px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .file-meta{
+      min-width:0;
+      display:grid;
+      gap:4px;
+    }
+
+    .file-name{
+      font-weight:700;
+      font-size:14px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .file-sub{
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .file-tag{
+      font-size:12px;
+      padding:6px 9px;
+      border-radius:999px;
+      background:rgba(255,255,255,.05);
+      color:#d9e0ef;
+      flex:none;
+    }
+
+    .progress{
+      width:100%;
+      height:11px;
+      border-radius:999px;
+      overflow:hidden;
+      background:rgba(255,255,255,.06);
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .bar{
+      width:0%;
+      height:100%;
+      background:linear-gradient(90deg, var(--accent), var(--accent-2));
+      border-radius:inherit;
+      transition:width var(--speed) var(--ease);
+    }
+
+    .meta-line{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      flex-wrap:wrap;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.4;
+    }
+
+    .room-banner{
+      display:grid;
+      gap:10px;
+    }
+
+    .room-url{
+      word-break:break-word;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.5;
+      background:rgba(6,8,12,.76);
+      border:1px solid rgba(255,255,255,.08);
+      padding:12px;
+      border-radius:16px;
+      max-height:140px;
+      overflow:auto;
+    }
+
+    .qr-box{
+      display:grid;
+      place-items:center;
+      background:#fff;
+      border-radius:24px;
+      padding:12px;
+      min-height:268px;
+      cursor:pointer;
+      box-shadow:0 24px 60px rgba(0,0,0,.3);
+      position:relative;
+      overflow:hidden;
+    }
+
+    .qr-box::after{
+      content:"Нажми, чтобы увеличить";
+      position:absolute;
+      left:12px;
+      right:12px;
+      bottom:12px;
+      padding:8px 10px;
+      border-radius:999px;
+      background:rgba(0,0,0,.72);
+      color:#fff;
+      font-size:11px;
+      text-align:center;
+      opacity:0;
+      transform:translateY(6px);
+      transition:opacity var(--speed) var(--ease), transform var(--speed) var(--ease);
+      pointer-events:none;
+    }
+
+    .qr-box:hover::after{
+      opacity:1;
+      transform:translateY(0);
+    }
+
+    .qr-note{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.5;
+      text-align:center;
+    }
+
+    .chat-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+
+    .chat-title{
+      display:grid;
+      gap:3px;
+    }
+
+    .chat-title strong{
+      font-size:18px;
+      letter-spacing:-.02em;
+    }
+
+    .chat-title span{
+      font-size:12px;
+      color:var(--muted);
+    }
+
+    .messages{
+      flex:1;
+      min-height:360px;
+      max-height:calc(100vh - 370px);
+      overflow:auto;
+      padding:6px 2px 6px 2px;
+      display:grid;
+      gap:10px;
+      scroll-behavior:smooth;
+    }
+
+    .messages::-webkit-scrollbar,
+    .room-url::-webkit-scrollbar,
+    textarea::-webkit-scrollbar{
+      width:10px;
+      height:10px;
+    }
+
+    .messages::-webkit-scrollbar-thumb,
+    .room-url::-webkit-scrollbar-thumb,
+    textarea::-webkit-scrollbar-thumb{
+      background:rgba(255,255,255,.15);
+      border-radius:999px;
+      border:2px solid transparent;
+      background-clip:padding-box;
+    }
+
+    .messages::-webkit-scrollbar-track,
+    .room-url::-webkit-scrollbar-track,
+    textarea::-webkit-scrollbar-track{
+      background:transparent;
+    }
+
+    .msg{
+      width:var(--msg-w);
+      max-width:100%;
+      display:grid;
+      gap:6px;
+      animation:msgIn .22s var(--ease) both;
+    }
+
+    @keyframes msgIn{
+      from{opacity:0; transform:translateY(8px) scale(.985)}
+      to{opacity:1; transform:translateY(0) scale(1)}
+    }
+
+    .msg.me{margin-left:auto}
+    .msg.them{margin-right:auto}
+
+    .bubble{
+      position:relative;
+      padding:12px 13px 11px 13px;
+      border-radius:22px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      backdrop-filter:blur(14px);
+      overflow:hidden;
+      box-shadow:0 14px 30px rgba(0,0,0,.12);
+    }
+
+    .msg.me .bubble{
+      background:linear-gradient(135deg, rgba(139,92,246,.22), rgba(34,211,238,.12));
+      border-color:rgba(139,92,246,.2);
+    }
+
+    .bubble::before{
+      content:"";
+      position:absolute;
+      inset:0;
+      background:linear-gradient(90deg, rgba(255,255,255,.07), transparent 15%, transparent 85%, rgba(255,255,255,.06));
+      opacity:.18;
+      pointer-events:none;
+    }
+
+    .meta{
+      display:flex;
+      justify-content:space-between;
+      gap:10px;
+      font-size:11px;
+      color:var(--muted);
+      line-height:1.2;
+    }
+
+    .meta .sender{
+      display:inline-flex;
+      gap:8px;
+      align-items:center;
+      min-width:0;
+    }
+
+    .name{
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+      max-width:22ch;
+      color:#dfe6f4;
+      font-weight:700;
+    }
+
+    .status-dot{
+      width:7px;height:7px;border-radius:999px;
+      background:var(--accent-2);
+      box-shadow:0 0 0 4px rgba(34,211,238,.1);
+      flex:none;
+    }
+
+    .content{
+      margin-top:8px;
+      white-space:pre-wrap;
+      word-break:break-word;
+      line-height:1.55;
+      font-size:14px;
+    }
+
+    .content a{
+      color:#9ae6ff;
+      text-decoration:none;
+      border-bottom:1px solid rgba(154,230,255,.25);
+    }
+
+    .content a:hover{
+      border-bottom-color:rgba(154,230,255,.65);
+    }
+
+    .code-block{
+      margin-top:10px;
+      background:rgba(6,8,12,.8);
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:18px;
+      padding:12px;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.55;
+      white-space:pre-wrap;
+      overflow:auto;
+    }
+
+    .attachment{
+      margin-top:10px;
+      display:grid;
+      gap:10px;
+    }
+
+    .attach-box{
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      padding:12px;
+      border-radius:18px;
+      background:rgba(0,0,0,.18);
+      border:1px solid rgba(255,255,255,.06);
+    }
+
+    .attach-left{
+      min-width:0;
+      display:grid;
+      gap:4px;
+    }
+
+    .attach-name{
+      font-weight:800;
+      font-size:14px;
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .attach-sub{
+      font-size:12px;
+      color:var(--muted);
+      white-space:nowrap;
+      overflow:hidden;
+      text-overflow:ellipsis;
+    }
+
+    .thumb{
+      width:100%;
+      max-height:320px;
+      border-radius:18px;
+      overflow:hidden;
+      background:#000;
+      border:1px solid rgba(255,255,255,.08);
+    }
+
+    .thumb img,
+    .thumb video{
+      width:100%;
+      height:100%;
+      max-height:320px;
+      object-fit:contain;
+      display:block;
+      background:#000;
+    }
+
+    .composer{
+      padding-top:6px;
+      display:grid;
+      gap:12px;
+    }
+
+    .composer-top{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto auto auto auto;
+      gap:10px;
+      align-items:end;
+    }
+
+    .composer-bottom{
+      display:grid;
+      grid-template-columns:minmax(0,1fr) auto;
+      gap:10px;
+      align-items:center;
+    }
+
+    .composer textarea{
+      min-height:62px;
+      max-height:160px;
+      resize:vertical;
+    }
+
+    .indicator{
+      display:inline-flex;
+      align-items:center;
+      gap:8px;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .typing{
+      display:flex;
+      align-items:center;
+      gap:6px;
+      color:var(--muted);
+      font-size:12px;
+      min-height:16px;
+    }
+
+    .typing .dots{
+      position:relative;
+      width:26px;height:12px;
+      background:none;
+      opacity:1;
+      mask-image:none;
+    }
+
+    .typing .dots::before,
+    .typing .dots::after,
+    .typing .dots span{
+      content:"";
+      position:absolute;
+      top:50%;
+      width:5px;height:5px;border-radius:999px;
+      background:var(--accent-2);
+      transform:translateY(-50%);
+      animation:dotPulse 1.2s infinite ease-in-out;
+    }
+
+    .typing .dots::before{left:0; animation-delay:0s}
+    .typing .dots span{left:10px; animation-delay:.15s}
+    .typing .dots::after{left:20px; animation-delay:.3s}
+
+    @keyframes dotPulse{
+      0%,80%,100%{transform:translateY(-50%) scale(.55); opacity:.35}
+      40%{transform:translateY(-50%) scale(1); opacity:1}
+    }
+
+    .footer{
+      padding:0 16px 18px 16px;
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.65;
+      text-align:center;
+    }
+
+    .empty{
+      min-height:220px;
+      display:grid;
+      place-items:center;
+      color:var(--muted);
+      text-align:center;
+      line-height:1.65;
+      padding:24px;
+    }
+
+    .empty strong{
+      color:#dfe6f4;
+      display:block;
+      margin-bottom:8px;
+      font-size:16px;
+    }
+
+    .flag{
+      display:inline-flex;
+      align-items:center;
+      gap:7px;
+      padding:7px 10px;
+      border-radius:999px;
+      background:rgba(255,255,255,.04);
+      border:1px solid rgba(255,255,255,.08);
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .link-btn{
+      background:none;
+      border:none;
+      color:#a6ebff;
+      padding:0;
+      cursor:pointer;
+      font:inherit;
+      text-decoration:underline;
+      text-underline-offset:2px;
+    }
+
+    .tabs{
+      display:none;
+    }
+
+    .overlay{
+      position:fixed; inset:0; z-index:60;
+      display:none;
+      background:rgba(4,6,10,.78);
+      backdrop-filter:blur(16px);
+      padding:16px;
+    }
+
+    .overlay.show{
+      display:grid;
+      place-items:center;
+    }
+
+    .modal{
+      width:min(980px,100%);
+      background:linear-gradient(180deg, rgba(16,21,35,.96), rgba(10,13,21,.96));
+      border:1px solid rgba(255,255,255,.1);
+      border-radius:30px;
+      box-shadow:0 30px 120px rgba(0,0,0,.62);
+      overflow:hidden;
+    }
+
+    .modal-head{
+      display:flex;
+      justify-content:space-between;
+      align-items:flex-start;
+      gap:12px;
+      padding:16px 16px 0 16px;
+    }
+
+    .modal-body{
+      padding:16px;
+      display:grid;
+      grid-template-columns:1fr 320px;
+      gap:16px;
+    }
+
+    .modal-stage{
+      background:#05060a;
+      border:1px solid rgba(255,255,255,.08);
+      border-radius:26px;
+      overflow:hidden;
+      display:grid;
+      place-items:center;
+      min-height:500px;
+    }
+
+    .modal-stage img{
+      width:100%;
+      height:100%;
+      object-fit:contain;
+      background:#fff;
+    }
+
+    .setup{
+      display:grid;
+      gap:12px;
+    }
+
+    .setup textarea{
+      min-height:220px;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      line-height:1.55;
+    }
+
+    .notice{
+      padding:14px;
+      border-radius:18px;
+      background:rgba(245,158,11,.08);
+      border:1px solid rgba(245,158,11,.2);
+      color:#ffe8be;
+      line-height:1.55;
+      font-size:13px;
+    }
+
+    .danger-box{
+      padding:14px;
+      border-radius:18px;
+      background:rgba(239,68,68,.08);
+      border:1px solid rgba(239,68,68,.2);
+      color:#ffd7db;
+      line-height:1.55;
+      font-size:13px;
+    }
+
+    .success-box{
+      padding:14px;
+      border-radius:18px;
+      background:rgba(52,211,153,.08);
+      border:1px solid rgba(52,211,153,.2);
+      color:#dcffe9;
+      line-height:1.55;
+      font-size:13px;
+    }
+
+    .hint{
+      color:var(--muted);
+      font-size:12px;
+      line-height:1.55;
+    }
+
+    .file-input{
+      display:none;
+    }
+
+    .shadow-surface{
+      position:absolute; inset:0;
+      background:
+        radial-gradient(circle at 20% 20%, rgba(139,92,246,.09), transparent 20%),
+        radial-gradient(circle at 80% 20%, rgba(34,211,238,.08), transparent 18%);
+      pointer-events:none;
+    }
+
+    .quick-actions{
+      display:flex;
+      gap:8px;
+      flex-wrap:wrap;
+    }
+
+    .chip-button{
+      min-height:36px;
+      padding:0 12px;
+      border-radius:999px;
+      font-size:12px;
+    }
+
+    .tiny{
+      font-size:11px;
+      color:var(--muted);
+    }
+
+    @media (max-width: 1220px){
+      :root{ --sidebar-w: 330px; --msg-w:min(760px,92%); }
+      .hero{grid-template-columns:1fr}
+      .workspace{grid-template-columns:1fr}
+      .chat{min-height:auto}
+      .messages{max-height:unset}
+    }
+
+    @media (max-width: 900px){
+      .topbar{
+        height:auto;
+        min-height:var(--nav-h);
+        align-items:flex-start;
+        flex-direction:column;
+      }
+
+      .top-actions{
+        width:100%;
+        justify-content:space-between;
+      }
+
+      .stats{
+        order:2;
+      }
+
+      .composer-top{
+        grid-template-columns:1fr 1fr;
+      }
+
+      .composer-top .fill{
+        grid-column:1 / -1;
+      }
+
+      .composer-bottom{
+        grid-template-columns:1fr;
+      }
+
+      .modal-body{
+        grid-template-columns:1fr;
+      }
+
+      .modal-stage{
+        min-height:320px;
+      }
+    }
+
+    @media (max-width: 720px){
+      .page{padding:12px}
+      .hero-copy{padding:18px}
+      .stats{padding:14px}
+      .sidebar,.chat{padding:14px}
+      .btn{min-height:42px}
+      .composer-top{
+        grid-template-columns:1fr;
+      }
+      .composer-top > *{width:100%}
+      .pill{font-size:12px}
+      .hero-title{max-width:100%}
+      .messages{
+        min-height:290px;
+      }
+      .msg{
+        width:100%;
+      }
+    }
+
+    /* subtle entrance */
+    .fade-in{
+      animation:fadeIn .45s var(--ease) both;
+    }
+
+    @keyframes fadeIn{
+      from{opacity:0; transform:translateY(10px)}
+      to{opacity:1; transform:translateY(0)}
+    }
+
+    .pulse-border{
+      position:relative;
+    }
+
+    .pulse-border::after{
+      content:"";
+      position:absolute;
+      inset:-1px;
+      border-radius:inherit;
+      padding:1px;
+      background:linear-gradient(135deg, rgba(139,92,246,.38), rgba(34,211,238,.18), rgba(244,63,94,.22));
+      -webkit-mask:linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+      -webkit-mask-composite:xor;
+      mask-composite:exclude;
+      opacity:.42;
+      pointer-events:none;
+      animation:borderGlow 6s ease-in-out infinite;
+    }
+
+    @keyframes borderGlow{
+      0%,100%{opacity:.24}
+      50%{opacity:.56}
+    }
+  </style>
+</head>
+<body>
+  <div class="mesh"></div>
+  <div class="blobs">
+    <div class="blob b1"></div>
+    <div class="blob b2"></div>
+    <div class="blob b3"></div>
+  </div>
+  <div class="dots"></div>
+
+  <div class="overlay" id="overlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="chat-title">
+          <strong id="overlayTitle">QR комнаты</strong>
+          <span id="overlaySubtitle">Нажми на QR, чтобы увеличить его</span>
+        </div>
+        <button class="btn" id="btnOverlayClose">Закрыть</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-stage" id="overlayStage"></div>
+        <div class="setup">
+          <div class="card">
+            <div class="section-title"><h2>Комната</h2><span class="badge">QR link</span></div>
+            <div class="room-url" id="roomUrlFull"></div>
+          </div>
+          <div class="notice">
+            QR содержит только короткую ссылку на комнату, поэтому он сканируется быстро. После скана телефон сразу открывает этот сайт и попадает в нужную комнату.
+          </div>
+          <div class="hint">
+            Если хочешь, можно держать этот экран открытым на компьютере, а телефон просто сканирует QR и автоматически подключается к той же комнате.
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="overlay" id="setupOverlay">
+    <div class="modal">
+      <div class="modal-head">
+        <div class="chat-title">
+          <strong>Настройка Firebase</strong>
+          <span>Для реального обмена между устройствами нужен backend</span>
+        </div>
+        <button class="btn" id="btnSetupClose">Закрыть</button>
+      </div>
+      <div class="modal-body">
+        <div class="setup">
+          <div class="card">
+            <div class="section-title"><h2>Вставь конфиг</h2><span class="badge">JSON</span></div>
+            <textarea id="firebaseConfigInput" placeholder='{"apiKey":"...","authDomain":"...","databaseURL":"...","projectId":"...","storageBucket":"...","messagingSenderId":"...","appId":"..."}'></textarea>
+            <div class="row" style="margin-top:10px">
+              <button class="btn primary" id="btnSaveFirebaseConfig">Сохранить конфиг</button>
+              <button class="btn" id="btnUseDemo">Демо-режим</button>
+            </div>
+          </div>
+          <div class="danger-box">
+            Без Firebase QR-комната будет только локальной демонстрацией. Для реального чата между ПК и телефоном нужны Realtime Database и Storage.
+          </div>
+          <div class="hint">
+            Храни конфиг в localStorage. Его не обязательно вписывать в код вручную после первой настройки.
+          </div>
+        </div>
+        <div class="card">
+          <div class="section-title"><h2>Что включить в Firebase</h2><span class="badge">3 шага</span></div>
+          <div class="hint" style="display:grid; gap:10px">
+            <div class="success-box">1. Создай Firebase project</div>
+            <div class="success-box">2. Включи Authentication → Anonymous</div>
+            <div class="success-box">3. Включи Realtime Database и Storage</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="shell">
+    <header class="topbar">
+      <div class="brand">
+        <div class="mark" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+            <path d="M4 17.5C4 11.7 8.7 7 14.5 7h3.6a2 2 0 0 1 2 2v.8a2 2 0 0 1-2 2h-4.2c-1.3 0-2.4 1-2.4 2.3v3.4a1.9 1.9 0 0 1-1.9 1.9H6A2 2 0 0 1 4 17.5Z" fill="white" opacity=".9"/>
+            <path d="M8.4 11.8h6.2c1.4 0 2.5-1.1 2.5-2.5V8" stroke="white" stroke-width="1.8" stroke-linecap="round"/>
+          </svg>
+        </div>
+        <div class="brand-text">
+          <strong>ShadowDrop Messenger</strong>
+          <span id="brandSub">закрытая комната • QR link • телефон ↔ ПК</span>
+        </div>
+      </div>
+
+      <div class="top-actions">
+        <button class="btn" id="btnOpenSetup">Firebase</button>
+        <button class="btn" id="btnCopyRoomLink" disabled>Копировать ссылку</button>
+        <button class="btn good" id="btnCreateRoom">Создать комнату</button>
+        <button class="btn warn" id="btnJoinFromUrl">Войти по ссылке</button>
+        <button class="btn bad" id="btnLeaveRoom">Выйти</button>
+      </div>
+    </header>
+
+    <main class="page">
+      <section class="hero">
+        <div class="panel fade-in pulse-border">
+          <div class="hero-copy">
+            <div class="eyebrow">QR-связка • приватный чат • realtime</div>
+            <h1 class="hero-title">Мессенджер без лишнего шума.</h1>
+            <p class="hero-desc">
+              Открываешь комнату на компьютере, сканируешь короткий QR телефоном и сразу попадаешь в закрытый чат.
+              Сообщения, ссылки, код, фото, видео и файлы летят в обе стороны в реальном времени.
+            </p>
+            <div class="hero-points">
+              <span class="pill">Короткий QR</span>
+              <span class="pill">Телефон ↔ ПК</span>
+              <span class="pill">Файлы и видео</span>
+              <span class="pill">Telegram-like UI</span>
+              <span class="pill">Автовход по ссылке</span>
+            </div>
+            <div class="hero-cta">
+              <button class="btn primary" id="btnCreateRoomHero">Создать и показать QR</button>
+              <button class="btn" id="btnPasteRoomLink">Вставить ссылку</button>
+              <button class="btn" id="btnShowTips">Подсказки</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel stats fade-in pulse-border">
+          <div class="stat-grid">
+            <div class="stat">
+              <div class="k">Статус</div>
+              <div class="v" id="uiConnection">Ожидание</div>
+              <div class="s" id="uiConnectionSub">Комната ещё не создана</div>
+            </div>
+            <div class="stat">
+              <div class="k">Комната</div>
+              <div class="v" id="uiRoomShort">—</div>
+              <div class="s" id="uiRoomLong">Ссылка появится после создания</div>
+            </div>
+            <div class="stat">
+              <div class="k">Отправлено</div>
+              <div class="v" id="uiSent">0 MB</div>
+              <div class="s">Текст и файлы</div>
+            </div>
+            <div class="stat">
+              <div class="k">Получено</div>
+              <div class="v" id="uiReceived">0 MB</div>
+              <div class="s">Входящий поток</div>
+            </div>
+          </div>
+
+          <div class="status warn" id="statusBar">
+            <span class="led"></span>
+            <span id="statusText">Создай комнату или открой ссылку в QR</span>
+          </div>
+
+          <div class="row">
+            <span class="flag">живой чат</span>
+            <span class="flag">анимации</span>
+            <span class="flag">drag & drop</span>
+            <span class="flag">preview</span>
+          </div>
+        </div>
+      </section>
+
+      <section class="workspace">
+        <aside class="panel sidebar fade-in pulse-border">
+          <div class="section-title">
+            <h2>Подключение</h2>
+            <span class="badge">room link</span>
+          </div>
+
+          <div class="room-banner card">
+            <div class="section-title" style="margin-bottom:10px">
+              <h3 style="font-size:16px">QR комнаты</h3>
+              <span class="badge">click to zoom</span>
+            </div>
+            <div class="qr-box" id="qrBox" title="Нажми, чтобы увеличить">
+              <span class="tiny">QR появится здесь</span>
+            </div>
+            <div class="qr-note" id="qrNote">
+              Сначала создай комнату. Потом телефон сканирует QR и открывает сразу нужный чат.
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="roomLinkInput">Ссылка комнаты</label>
+            <textarea class="textarea-tight" id="roomLinkInput" placeholder="Здесь появится ссылка вида https://.../?room=..." readonly></textarea>
+            <div class="quick-actions">
+              <button class="btn chip-button" id="btnCopyLinkSide" disabled>Копировать</button>
+              <button class="btn chip-button" id="btnOpenLinkNewTab" disabled>Открыть</button>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Состояние комнаты</label>
+            <div class="mini-list" id="memberList">
+              <div class="tiny">Пока никого нет.</div>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Файлы в очереди</label>
+            <div class="dropzone" id="dropzone">
+              Перетащи сюда фото, видео, документы, архивы или нажми «Выбрать файлы».
+            </div>
+            <div class="row">
+              <input class="file-input" id="fileInput" type="file" multiple />
+              <button class="btn primary" id="btnPickFiles">Выбрать файлы</button>
+              <button class="btn" id="btnSendQueuedFiles" disabled>Отправить</button>
+            </div>
+            <div class="mini-list" id="queuedFileList"></div>
+          </div>
+
+          <div class="field">
+            <label>Передача</label>
+            <div class="progress"><div class="bar" id="progressBar"></div></div>
+            <div class="meta-line">
+              <span id="progressText">0%</span>
+              <span id="trafficText">0 / 0</span>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Соединение</label>
+            <div class="indicator" id="transportIndicator">
+              <span class="status-dot"></span>
+              <span id="transportText">local demo / firebase awaiting</span>
+            </div>
+          </div>
+        </aside>
+
+        <section class="panel chat fade-in pulse-border">
+          <div class="chat-head">
+            <div class="chat-title">
+              <strong id="chatTitle">Закрытый чат</strong>
+              <span id="chatSubtitle">Пока комната не активна</span>
+            </div>
+            <div class="row">
+              <span class="badge" id="peerBadge">пир: —</span>
+              <span class="badge" id="roleBadge">роль: —</span>
+            </div>
+          </div>
+
+          <div class="typing" id="typingLine">
+            <span class="dots"><span></span></span>
+            <span id="typingText">Никто не печатает</span>
+          </div>
+
+          <div class="messages" id="messages">
+            <div class="empty" id="emptyState">
+              <div>
+                <strong>Чат пуст</strong>
+                <div>Создай комнату на компьютере или открой короткую ссылку с QR на телефоне. После подключения сообщения будут летать в обе стороны.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="composer">
+            <div class="composer-top">
+              <textarea class="fill" id="messageInput" placeholder="Напиши сообщение, вставь код, ссылку или команду..."></textarea>
+              <button class="btn primary" id="btnSendText" disabled>Отправить</button>
+              <button class="btn" id="btnCopyDraft">Копировать</button>
+              <button class="btn" id="btnScrollBottom">Вниз</button>
+              <button class="btn" id="btnClearDraft">Очистить</button>
+            </div>
+
+            <div class="composer-bottom">
+              <div class="hint">
+                Поддержка: текст, код, ссылки, фото, видео, pdf, zip и другие файлы. Нажми на вложение, чтобы скачать его.
+              </div>
+              <div class="row">
+                <button class="btn" id="btnToggleMobileView">Мобильный вид</button>
+                <button class="btn" id="btnTheme">Свечение</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <footer class="footer">
+      Если Firebase пока не настроен, открой меню «Firebase» и вставь конфиг. После этого комната станет реальной и будет работать между устройствами.
+    </footer>
+  </div>
+
+  <input id="hiddenFilePicker" class="file-input" type="file" multiple />
+
+  <script>
+    (function(){
+      "use strict";
+
+      /* =========================================================
+         CONFIG & CONSTANTS
+      ========================================================= */
+
+      const APP = {
+        name: "ShadowDrop Messenger",
+        storageKey: "shadowdrop.firebase.config.v1",
+        roomKey: "shadowdrop.current.room.v1",
+        userKey: "shadowdrop.current.user.v1",
+        draftKey: "shadowdrop.draft.v1",
+        themeKey: "shadowdrop.theme.v1",
+        mobileViewKey: "shadowdrop.mobile.view.v1",
+        demoKey: "shadowdrop.demo.mode.v1",
+        maxPreviewSize: 18 * 1024 * 1024
+      };
+
+      const COLORS = {
+        ok: "#34d399",
+        warn: "#f59e0b",
+        bad: "#ef4444",
+        blue: "#22d3ee",
+        accent: "#8b5cf6"
+      };
+
+      const SELECTORS = {
+        overlay: document.getElementById("overlay"),
+        overlayStage: document.getElementById("overlayStage"),
+        overlayTitle: document.getElementById("overlayTitle"),
+        overlaySubtitle: document.getElementById("overlaySubtitle"),
+        btnOverlayClose: document.getElementById("btnOverlayClose"),
+
+        setupOverlay: document.getElementById("setupOverlay"),
+        btnSetupClose: document.getElementById("btnSetupClose"),
+        firebaseConfigInput: document.getElementById("firebaseConfigInput"),
+        btnSaveFirebaseConfig: document.getElementById("btnSaveFirebaseConfig"),
+        btnUseDemo: document.getElementById("btnUseDemo"),
+
+        btnOpenSetup: document.getElementById("btnOpenSetup"),
+        btnCopyRoomLink: document.getElementById("btnCopyRoomLink"),
+        btnCreateRoom: document.getElementById("btnCreateRoom"),
+        btnJoinFromUrl: document.getElementById("btnJoinFromUrl"),
+        btnLeaveRoom: document.getElementById("btnLeaveRoom"),
+
+        btnCreateRoomHero: document.getElementById("btnCreateRoomHero"),
+        btnPasteRoomLink: document.getElementById("btnPasteRoomLink"),
+        btnShowTips: document.getElementById("btnShowTips"),
+
+        btnCopyRoomLinkSide: document.getElementById("btnCopyLinkSide"),
+        btnOpenLinkNewTab: document.getElementById("btnOpenLinkNewTab"),
+
+        brandSub: document.getElementById("brandSub"),
+        uiConnection: document.getElementById("uiConnection"),
+        uiConnectionSub: document.getElementById("uiConnectionSub"),
+        uiRoomShort: document.getElementById("uiRoomShort"),
+        uiRoomLong: document.getElementById("uiRoomLong"),
+        uiSent: document.getElementById("uiSent"),
+        uiReceived: document.getElementById("uiReceived"),
+        statusBar: document.getElementById("statusBar"),
+        statusText: document.getElementById("statusText"),
+        peerBadge: document.getElementById("peerBadge"),
+        roleBadge: document.getElementById("roleBadge"),
+        chatTitle: document.getElementById("chatTitle"),
+        chatSubtitle: document.getElementById("chatSubtitle"),
+        typingText: document.getElementById("typingText"),
+        transportText: document.getElementById("transportText"),
+        transportIndicator: document.getElementById("transportIndicator"),
+
+        qrBox: document.getElementById("qrBox"),
+        qrNote: document.getElementById("qrNote"),
+        roomUrlFull: document.getElementById("roomUrlFull"),
+        roomLinkInput: document.getElementById("roomLinkInput"),
+        memberList: document.getElementById("memberList"),
+        queuedFileList: document.getElementById("queuedFileList"),
+        progressBar: document.getElementById("progressBar"),
+        progressText: document.getElementById("progressText"),
+        trafficText: document.getElementById("trafficText"),
+
+        messages: document.getElementById("messages"),
+        emptyState: document.getElementById("emptyState"),
+        typingLine: document.getElementById("typingLine"),
+
+        messageInput: document.getElementById("messageInput"),
+        btnSendText: document.getElementById("btnSendText"),
+        btnCopyDraft: document.getElementById("btnCopyDraft"),
+        btnScrollBottom: document.getElementById("btnScrollBottom"),
+        btnClearDraft: document.getElementById("btnClearDraft"),
+        btnToggleMobileView: document.getElementById("btnToggleMobileView"),
+        btnTheme: document.getElementById("btnTheme"),
+
+        dropzone: document.getElementById("dropzone"),
+        fileInput: document.getElementById("fileInput"),
+        hiddenFilePicker: document.getElementById("hiddenFilePicker"),
+        btnPickFiles: document.getElementById("btnPickFiles"),
+        btnSendQueuedFiles: document.getElementById("btnSendQueuedFiles"),
+      };
+
+      const state = {
+        firebaseConfig: null,
+        firebaseReady: false,
+        demoMode: false,
+
+        auth: null,
+        db: null,
+        storage: null,
+
+        roomId: null,
+        roomRef: null,
+        messagesRef: null,
+        typingRef: null,
+        membersRef: null,
+        presenceRef: null,
+        filesRef: null,
+
+        userId: null,
+        userName: null,
+        userColor: null,
+        userRole: "guest",
+
+        qrDataUrl: null,
+        qrCanvas: null,
+
+        queuedFiles: [],
+        draft: "",
+        themeGlow: true,
+        mobileView: false,
+
+        sentBytes: 0,
+        receivedBytes: 0,
+        totalBytes: 0,
+        uploadJobs: new Map(),
+        messagesCache: new Map(),
+        seenMessageIds: new Set(),
+
+        typingDebounce: null,
+        typingTimer: null,
+        typingHeartbeat: null,
+        presenceTimer: null,
+        isConnected: false,
+        unsubs: [],
+
+        localBroadcast: null,
+        localRoom: null,
+        localMembers: new Map(),
+        localMessages: [],
+        localTyping: new Map(),
+
+        overlayQR: null,
+        pendingJoinLink: null,
+
+        initialized: false,
+        demoBannerShown: false,
+        roomCreatedAt: null,
+        roomUpdatedAt: null,
+        roomLabel: null
+      };
+
+      /* =========================================================
+         UTILITIES
+      ========================================================= */
+
+      function $(id){ return document.getElementById(id); }
+
+      function now(){ return Date.now(); }
+
+      function uid(len = 10){
+        const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
+        let out = "";
+        const bytes = new Uint32Array(len);
+        crypto.getRandomValues(bytes);
+        for(let i=0;i<len;i++) out += chars[bytes[i] % chars.length];
+        return out;
+      }
+
+      function shortId(len = 6){
+        return uid(len).toUpperCase();
+      }
+
+      function clamp(n, min, max){
+        return Math.min(max, Math.max(min, n));
+      }
+
+      function sleep(ms){
+        return new Promise(resolve => setTimeout(resolve, ms));
+      }
+
+      function escapeHtml(str){
+        return String(str)
+          .replace(/&/g,"&amp;")
+          .replace(/</g,"&lt;")
+          .replace(/>/g,"&gt;")
+          .replace(/"/g,"&quot;")
+          .replace(/'/g,"&#39;");
+      }
+
+      function fmtBytes(bytes){
+        const units = ["B","KB","MB","GB","TB"];
+        let n = Number(bytes || 0);
+        let i = 0;
+        while(n >= 1024 && i < units.length - 1){
+          n /= 1024;
+          i++;
+        }
+        return `${i === 0 ? n : n.toFixed(1)} ${units[i]}`;
+      }
+
+      function fmtTime(ts){
+        const d = new Date(ts || now());
+        return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+      }
+
+      function fmtDate(ts){
+        const d = new Date(ts || now());
+        return d.toLocaleDateString([], { day: "2-digit", month: "short", year: "numeric" });
+      }
+
+      function isImageType(type, name){
+        const t = String(type || "").toLowerCase();
+        const n = String(name || "").toLowerCase();
+        return t.startsWith("image/") || /\.(png|jpe?g|gif|webp|avif|bmp|svg)$/i.test(n);
+      }
+
+      function isVideoType(type, name){
+        const t = String(type || "").toLowerCase();
+        const n = String(name || "").toLowerCase();
+        return t.startsWith("video/") || /\.(mp4|webm|mov|mkv|m4v|avi|ogv)$/i.test(n);
+      }
+
+      function isTextLikeType(type, name){
+        const t = String(type || "").toLowerCase();
+        const n = String(name || "").toLowerCase();
+        return t.startsWith("text/") || /\.(txt|md|json|js|ts|html|css|xml|yml|yaml|log|csv|py|rb|go|rs|cpp|c|h|java|php|sh|bat)$/i.test(n);
+      }
+
+      function fileIconType(type, name){
+        if(isImageType(type, name)) return "image";
+        if(isVideoType(type, name)) return "video";
+        if(isTextLikeType(type, name)) return "code";
+        if(/\.(pdf)$/i.test(name)) return "pdf";
+        if(/\.(zip|rar|7z|tar|gz|bz2|xz)$/i.test(name)) return "archive";
+        return "file";
+      }
+
+      function randomColor(){
+        const colors = ["#8b5cf6","#22d3ee","#f43f5e","#34d399","#f59e0b"];
+        return colors[Math.floor(Math.random() * colors.length)];
+      }
+
+      function toast(text, kind = "warn"){
+        setStatus(text, kind);
+      }
+
+      function setStatus(text, kind = "warn"){
+        SELECTORS.statusText.textContent = text;
+        SELECTORS.statusBar.classList.remove("ok","bad","good","warn");
+        SELECTORS.statusBar.classList.add(kind);
+        state.lastStatus = { text, kind, ts: now() };
+      }
+
+      function setConnected(flag){
+        state.isConnected = !!flag;
+        SELECTORS.btnSendText.disabled = !flag;
+        SELECTORS.btnSendQueuedFiles.disabled = !flag || state.queuedFiles.length === 0;
+        SELECTORS.peerBadge.textContent = flag ? "пир: online" : "пир: —";
+        SELECTORS.roleBadge.textContent = `роль: ${state.userRole}`;
+      }
+
+      function preserveScrollPosition(el, fn){
+        const top = el.scrollTop;
+        const bottomGap = el.scrollHeight - el.scrollTop - el.clientHeight;
+        fn();
+        if(bottomGap < 80){
+          el.scrollTop = el.scrollHeight;
+        }else{
+          el.scrollTop = top;
+        }
+      }
+
+      function linkifyText(text){
+        const safe = escapeHtml(text);
+        const urlRegex = /((https?:\/\/)[^\s<]+[^<.,:;"')\]\s])/g;
+        return safe.replace(urlRegex, (match) => {
+          const url = match;
+          return `<a href="${url}" target="_blank" rel="noopener noreferrer">${url}</a>`;
+        });
+      }
+
+      function renderCodeBlock(text){
+        return `<div class="code-block">${escapeHtml(text)}</div>`;
+      }
+
+      function normalizeRoomId(input){
+        const str = String(input || "").trim();
+        if(!str) return null;
+        const m = str.match(/[?&]room=([A-Za-z0-9_-]+)/i);
+        if(m) return m[1];
+        if(str.includes("room=")){
+          try{
+            const url = new URL(str, location.href);
+            return url.searchParams.get("room");
+          }catch(_){}
+        }
+        if(str.startsWith("#")) return str.slice(1);
+        if(str.length >= 4) return str.replace(/[^A-Za-z0-9_-]/g,"");
+        return null;
+      }
+
+      function makeRoomLink(roomId){
+        const url = new URL(location.href);
+        url.searchParams.set("room", roomId);
+        url.hash = "";
+        return url.toString();
+      }
+
+      function getCurrentRoomFromUrl(){
+        const url = new URL(location.href);
+        return normalizeRoomId(url.searchParams.get("room") || url.hash.slice(1));
+      }
+
+      function updateUrlRoom(roomId, push = false){
+        const url = new URL(location.href);
+        if(roomId){
+          url.searchParams.set("room", roomId);
+        }else{
+          url.searchParams.delete("room");
+        }
+        if(push){
+          history.pushState({}, "", url.toString());
+        }else{
+          history.replaceState({}, "", url.toString());
+        }
+      }
+
+      function setDraftText(text){
+        state.draft = text || "";
+        SELECTORS.messageInput.value = state.draft;
+        localStorage.setItem(APP.draftKey, state.draft);
+      }
+
+      function saveThemePref(){
+        localStorage.setItem(APP.themeKey, state.themeGlow ? "1" : "0");
+        localStorage.setItem(APP.mobileViewKey, state.mobileView ? "1" : "0");
+      }
+
+      function restorePrefs(){
+        state.themeGlow = localStorage.getItem(APP.themeKey) !== "0";
+        state.mobileView = localStorage.getItem(APP.mobileViewKey) === "1";
+        if(state.mobileView){
+          document.body.classList.add("mobile-compact");
+        }
+        if(state.themeGlow){
+          document.documentElement.style.setProperty("--blur", "18px");
+        }else{
+          document.documentElement.style.setProperty("--blur", "10px");
+        }
+      }
+
+      function applyMobileView(){
+        state.mobileView = !state.mobileView;
+        document.body.classList.toggle("mobile-compact", state.mobileView);
+        saveThemePref();
+      }
+
+      function toggleThemeGlow(){
+        state.themeGlow = !state.themeGlow;
+        document.documentElement.style.setProperty("--blur", state.themeGlow ? "18px" : "10px");
+        saveThemePref();
+        toast(state.themeGlow ? "Свечение включено" : "Свечение снижено", "good");
+      }
+
+      function setConnectionBadge(mode, sub){
+        SELECTORS.uiConnection.textContent = mode;
+        SELECTORS.uiConnectionSub.textContent = sub;
+      }
+
+      function setRoomHeader(roomId){
+        state.roomId = roomId || null;
+        const short = roomId ? roomId.toUpperCase() : "—";
+        const link = roomId ? makeRoomLink(roomId) : "Ссылка появится после создания";
+        SELECTORS.uiRoomShort.textContent = short;
+        SELECTORS.uiRoomLong.textContent = link;
+        SELECTORS.roomLinkInput.value = link;
+        SELECTORS.roomUrlFull.textContent = link;
+        SELECTORS.chatTitle.textContent = roomId ? `Комната ${short}` : "Закрытый чат";
+        SELECTORS.chatSubtitle.textContent = roomId ? `Открыта комната ${short}` : "Пока комната не активна";
+        SELECTORS.btnCopyRoomLink.disabled = !roomId;
+        SELECTORS.btnCopyLinkSide.disabled = !roomId;
+        SELECTORS.btnOpenLinkNewTab.disabled = !roomId;
+      }
+
+      function setTypingText(text){
+        SELECTORS.typingText.textContent = text;
+      }
+
+      function setTransport(text, kind = "warn"){
+        SELECTORS.transportText.textContent = text;
+        SELECTORS.transportIndicator.querySelector(".status-dot").style.background = kind === "ok" ? COLORS.ok : kind === "bad" ? COLORS.bad : COLORS.blue;
+      }
+
+      function clearMessages(){
+        SELECTORS.messages.innerHTML = "";
+        SELECTORS.messages.appendChild(SELECTORS.emptyState);
+      }
+
+      function ensureMessagesVisible(){
+        if(SELECTORS.emptyState && SELECTORS.emptyState.parentElement === SELECTORS.messages && state.messagesCache.size > 0){
+          SELECTORS.emptyState.remove();
+        }
+      }
+
+      function scrollToBottom(force = false){
+        if(force || isNearBottom(SELECTORS.messages)){
+          SELECTORS.messages.scrollTop = SELECTORS.messages.scrollHeight;
+        }
+      }
+
+      function isNearBottom(el){
+        const gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+        return gap < 120;
+      }
+
+      function debounce(fn, wait){
+        let t;
+        return (...args) => {
+          clearTimeout(t);
+          t = setTimeout(() => fn(...args), wait);
+        };
+      }
+
+      function serializeConfig(cfg){
+        return JSON.stringify(cfg, null, 2);
+      }
+
+      function parseConfig(text){
+        const cfg = JSON.parse(text);
+        if(!cfg || typeof cfg !== "object") throw new Error("Invalid config");
+        return cfg;
+      }
+
+      function copyText(text){
+        return navigator.clipboard.writeText(text);
+      }
+
+      async function pasteText(){
+        return navigator.clipboard.readText();
+      }
+
+      function getUserProfile(){
+        let data = null;
+        try{
+          data = JSON.parse(localStorage.getItem(APP.userKey) || "null");
+        }catch(_){}
+        if(data && data.id) return data;
+        const profile = {
+          id: uid(12),
+          name: `User-${shortId(4)}`,
+          color: randomColor()
+        };
+        localStorage.setItem(APP.userKey, JSON.stringify(profile));
+        return profile;
+      }
+
+      function getStoredConfig(){
+        const raw = localStorage.getItem(APP.storageKey);
+        if(!raw) return null;
+        try{
+          return JSON.parse(raw);
+        }catch(_){
+          return null;
+        }
+      }
+
+      function saveStoredConfig(cfg){
+        localStorage.setItem(APP.storageKey, JSON.stringify(cfg));
+      }
+
+      function removeStoredConfig(){
+        localStorage.removeItem(APP.storageKey);
+      }
+
+      function getDemoRoomKey(){
+        return `shadowdrop.demo.room.${state.roomId || "none"}`;
+      }
+
+      function demoStorage(){
+        try{
+          return JSON.parse(localStorage.getItem(getDemoRoomKey()) || "{}");
+        }catch(_){
+          return {};
+        }
+      }
+
+      function saveDemoStorage(obj){
+        localStorage.setItem(getDemoRoomKey(), JSON.stringify(obj));
+      }
+
+      function safeUrl(url){
+        try{
+          return new URL(url, location.href).toString();
+        }catch(_){
+          return String(url || "");
+        }
+      }
+
+      function downloadHref(name, href){
+        const a = document.createElement("a");
+        a.href = href;
+        a.download = name || "";
+        a.target = "_blank";
+        a.rel = "noopener noreferrer";
+        a.click();
+      }
+
+      function fileNameOnly(name){
+        return String(name || "file").replace(/[\\/]/g,"_");
+      }
+
+      function createQR(container, text, size = 226){
+        container.innerHTML = "";
+        const qr = new QRCode(container, {
+          text,
+          width: size,
+          height: size,
+          colorDark: "#0a0f1c",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+        return qr;
+      }
+
+      function randomRoomId(){
+        return uid(7).toUpperCase();
+      }
+
+      function roomPath(roomId){
+        return `rooms/${roomId}`;
+      }
+
+      function messagePath(roomId){
+        return `rooms/${roomId}/messages`;
+      }
+
+      function membersPath(roomId){
+        return `rooms/${roomId}/members`;
+      }
+
+      function typingPath(roomId){
+        return `rooms/${roomId}/typing`;
+      }
+
+      function presencePath(roomId){
+        return `rooms/${roomId}/presence`;
+      }
+
+      function filesPath(roomId){
+        return `rooms/${roomId}/files`;
+      }
+
+      function nowIso(){
+        return new Date(now()).toISOString();
+      }
+
+      function detectMimeName(file){
+        return file.type || "";
+      }
+
+      function kindFromText(text){
+        const trimmed = String(text || "").trim();
+        if(!trimmed) return "empty";
+        if(/```/.test(trimmed)) return "code";
+        if(/^(https?:\/\/)/i.test(trimmed) || /\nhttps?:\/\//i.test(trimmed)) return "links";
+        if(trimmed.length > 400) return "long";
+        return "text";
+      }
+
+      function renderMarkdownish(text){
+        let html = escapeHtml(text);
+        html = html.replace(/```([\s\S]*?)```/g, (_, code) => `<div class="code-block">${escapeHtml(code)}</div>`);
+        html = html.replace(/`([^`]+)`/g, (_, code) => `<code style="background:rgba(0,0,0,.22);padding:2px 6px;border-radius:8px;border:1px solid rgba(255,255,255,.08)">${escapeHtml(code)}</code>`);
+        html = linkifyText(html);
+        return html;
+      }
+
+      function roomLabel(roomId){
+        return roomId ? `#${roomId}` : "—";
+      }
+
+      function filePreviewMarkup(file){
+        if(isImageType(file.type, file.name)){
+          return `<div class="thumb"><img src="${file.url}" alt="${escapeHtml(file.name)}"></div>`;
+        }
+        if(isVideoType(file.type, file.name)){
+          return `<div class="thumb"><video controls playsinline src="${file.url}"></video></div>`;
+        }
+        return "";
+      }
+
+      function buildFileCard(file, mine){
+        const icon = fileIconType(file.type, file.name);
+        const preview = filePreviewMarkup(file);
+        return `
+          <div class="attachment">
+            <div class="attach-box">
+              <div class="attach-left">
+                <div class="attach-name">${escapeHtml(file.name)}</div>
+                <div class="attach-sub">${fmtBytes(file.size)} • ${escapeHtml(file.type || icon)}</div>
+              </div>
+              <div class="row">
+                <button class="btn chip-button" data-download="${escapeHtml(file.url)}" data-name="${escapeHtml(file.name)}">Скачать</button>
+              </div>
+            </div>
+            ${preview}
+          </div>
+        `;
+      }
+
+      function buildMessageNode(msg){
+        const isMine = msg.senderId === state.userId;
+        const wrapper = document.createElement("article");
+        wrapper.className = `msg ${isMine ? "me" : "them"}`;
+        wrapper.dataset.id = msg.id;
+
+        const bubble = document.createElement("div");
+        bubble.className = "bubble";
+
+        const meta = document.createElement("div");
+        meta.className = "meta";
+
+        const sender = document.createElement("div");
+        sender.className = "sender";
+        sender.innerHTML = `
+          <span class="status-dot" style="background:${msg.senderColor || COLORS.blue}"></span>
+          <span class="name">${escapeHtml(msg.senderName || "User")}</span>
+        `;
+
+        const time = document.createElement("div");
+        time.textContent = msg.ts ? fmtTime(msg.ts) : "";
+
+        meta.appendChild(sender);
+        meta.appendChild(time);
+
+        const content = document.createElement("div");
+        content.className = "content";
+
+        if(msg.type === "text"){
+          content.innerHTML = renderMarkdownish(msg.text || "");
+        }else if(msg.type === "system"){
+          content.innerHTML = `<span style="color:#cbd5e1">${escapeHtml(msg.text || "")}</span>`;
+        }else if(msg.type === "file"){
+          const file = msg.file || {};
+          content.innerHTML = `
+            <div class="attachment">
+              <div class="attach-box">
+                <div class="attach-left">
+                  <div class="attach-name">${escapeHtml(file.name || "file")}</div>
+                  <div class="attach-sub">${fmtBytes(file.size || 0)} • ${escapeHtml(file.type || "file")}</div>
+                </div>
+                <div class="row">
+                  <button class="btn chip-button" data-download="${escapeHtml(file.url || "")}" data-name="${escapeHtml(file.name || "file")}">Скачать</button>
+                </div>
+              </div>
+              ${isImageType(file.type, file.name) ? `<div class="thumb"><img src="${file.url}" alt="${escapeHtml(file.name)}"></div>` : ""}
+              ${isVideoType(file.type, file.name) ? `<div class="thumb"><video controls playsinline src="${file.url}"></video></div>` : ""}
+            </div>
+          `;
+        }else if(msg.type === "mixed"){
+          content.innerHTML = renderMarkdownish(msg.text || "");
+        }else{
+          content.textContent = msg.text || "";
+        }
+
+        bubble.appendChild(meta);
+        bubble.appendChild(content);
+
+        if(msg.replyTo){
+          const reply = document.createElement("div");
+          reply.style.marginTop = "10px";
+          reply.style.padding = "10px 12px";
+          reply.style.borderRadius = "16px";
+          reply.style.background = "rgba(0,0,0,.18)";
+          reply.style.border = "1px solid rgba(255,255,255,.06)";
+          reply.innerHTML = `<div class="tiny">reply</div><div class="small">${escapeHtml(msg.replyPreview || "")}</div>`;
+          bubble.appendChild(reply);
+        }
+
+        if(msg.edited){
+          const edited = document.createElement("div");
+          edited.className = "tiny";
+          edited.style.marginTop = "8px";
+          edited.textContent = "edited";
+          bubble.appendChild(edited);
+        }
+
+        wrapper.appendChild(bubble);
+        return wrapper;
+      }
+
+      function renderMemberChip(member){
+        const el = document.createElement("div");
+        el.className = "file-item";
+        el.innerHTML = `
+          <div class="file-meta">
+            <div class="file-name">${escapeHtml(member.name || "User")}</div>
+            <div class="file-sub">${member.status || "online"} • ${member.id === state.userId ? "you" : "peer"}</div>
+          </div>
+          <div class="file-tag" style="background:${member.color || COLORS.blue}22;border:1px solid ${(member.color || COLORS.blue)}33">${member.role || "guest"}</div>
+        `;
+        return el;
+      }
+
+      function renderQueuedFile(file, index){
+        const item = document.createElement("div");
+        item.className = "file-item";
+        item.innerHTML = `
+          <div class="file-meta">
+            <div class="file-name">${escapeHtml(file.name)}</div>
+            <div class="file-sub">${fmtBytes(file.size)} • ${escapeHtml(file.type || "unknown")}</div>
+          </div>
+          <div class="file-tag">#${index + 1}</div>
+        `;
+        return item;
+      }
+
+      function updateProgress(sent, total){
+        const pct = total ? clamp(Math.round(sent / total * 100), 0, 100) : 0;
+        SELECTORS.progressBar.style.width = `${pct}%`;
+        SELECTORS.progressText.textContent = `${pct}%`;
+        SELECTORS.trafficText.textContent = `${fmtBytes(sent)} / ${fmtBytes(total)}`;
+      }
+
+      function showEmptyState(show){
+        if(show){
+          if(!SELECTORS.emptyState.parentElement){
+            SELECTORS.messages.prepend(SELECTORS.emptyState);
+          }
+        }else{
+          if(SELECTORS.emptyState.parentElement){
+            SELECTORS.emptyState.remove();
+          }
+        }
+      }
+
+      function clearQueuedFiles(){
+        state.queuedFiles = [];
+        SELECTORS.queuedFileList.innerHTML = "";
+        SELECTORS.btnSendQueuedFiles.disabled = !state.isConnected;
+      }
+
+      function addQueuedFiles(files){
+        const list = [...files];
+        if(!list.length) return;
+        state.queuedFiles = [...state.queuedFiles, ...list];
+        SELECTORS.queuedFileList.innerHTML = "";
+        state.queuedFiles.forEach((file, idx) => {
+          SELECTORS.queuedFileList.appendChild(renderQueuedFile(file, idx));
+        });
+        SELECTORS.btnSendQueuedFiles.disabled = !state.isConnected || state.queuedFiles.length === 0;
+      }
+
+      function systemMessage(text){
+        return {
+          id: `sys_${uid(10)}`,
+          type: "system",
+          senderId: "system",
+          senderName: "System",
+          senderColor: COLORS.blue,
+          ts: now(),
+          text
+        };
+      }
+
+      function localRoomObject(){
+        const store = demoStorage();
+        store.rooms ||= {};
+        store.rooms[state.roomId] ||= { messages: [], members: {}, typing: {} };
+        return store.rooms[state.roomId];
+      }
+
+      function localPushMessage(msg){
+        const room = localRoomObject();
+        room.messages.push(msg);
+        saveDemoStorage(demoStorage());
+      }
+
+      function localUpsertMember(member){
+        const room = localRoomObject();
+        room.members[member.id] = member;
+        saveDemoStorage(demoStorage());
+      }
+
+      function localSetTyping(userId, active){
+        const room = localRoomObject();
+        room.typing[userId] = { active: !!active, ts: now() };
+        saveDemoStorage(demoStorage());
+      }
+
+      function localRoomMembers(){
+        const room = localRoomObject();
+        return Object.values(room.members || {});
+      }
+
+      function localRoomMessages(){
+        const room = localRoomObject();
+        return (room.messages || []).slice().sort((a,b) => (a.ts||0) - (b.ts||0));
+      }
+
+      function localRoomTyping(){
+        const room = localRoomObject();
+        return room.typing || {};
+      }
+
+      function localJoinRoom(roomId){
+        state.localRoom = roomId;
+        state.userRole = state.roomId ? "host" : "guest";
+        localUpsertMember({
+          id: state.userId,
+          name: state.userName,
+          color: state.userColor,
+          role: state.userRole,
+          status: "online",
+          ts: now()
+        });
+        localPushMessage(systemMessage(`${state.userName} joined the room`));
+        startLocalPoll();
+      }
+
+      function startLocalPoll(){
+        stopLocalPoll();
+        const tick = () => {
+          if(!state.roomId || !state.demoMode) return;
+          syncFromLocal();
+        };
+        state.localBroadcast = setInterval(tick, 700);
+      }
+
+      function stopLocalPoll(){
+        if(state.localBroadcast){
+          clearInterval(state.localBroadcast);
+          state.localBroadcast = null;
+        }
+      }
+
+      function syncFromLocal(){
+        const members = localRoomMembers();
+        renderMembers(members);
+
+        const messages = localRoomMessages();
+        messages.forEach(msg => {
+          if(!state.seenMessageIds.has(msg.id)){
+            state.seenMessageIds.add(msg.id);
+            renderMessage(msg, false);
+          }
+        });
+        refreshTypingFromLocal();
+      }
+
+      function refreshTypingFromLocal(){
+        const typing = localRoomTyping();
+        const names = Object.values(typing)
+          .filter(x => x && x.active && x.id !== state.userId)
+          .map(x => x.name)
+          .slice(0,2);
+        if(names.length === 0){
+          setTypingText("Никто не печатает");
+        }else if(names.length === 1){
+          setTypingText(`${names[0]} печатает...`);
+        }else{
+          setTypingText(`${names[0]} и ${names[1]} печатают...`);
+        }
+      }
+
+      /* =========================================================
+         FIREBASE INIT
+      ========================================================= */
+
+      async function initFirebaseIfPossible(){
+        const cfg = getStoredConfig();
+        state.firebaseConfig = cfg;
+
+        if(!cfg){
+          state.demoMode = true;
+          setTransport("demo mode", "warn");
+          maybeShowSetupOverlay(true);
+          return false;
+        }
+
+        if(!window.firebase){
+          state.demoMode = true;
+          setTransport("firebase scripts missing", "bad");
+          maybeShowSetupOverlay(true);
+          return false;
+        }
+
+        try{
+          if(!firebase.apps.length){
+            firebase.initializeApp(cfg);
+          }
+          state.db = firebase.database();
+          state.storage = firebase.storage();
+          state.auth = firebase.auth();
+
+          await firebase.auth().signInAnonymously().catch(() => null);
+
+          state.firebaseReady = true;
+          state.demoMode = false;
+          setTransport("firebase connected", "ok");
+          SELECTORS.brandSub.textContent = "закрытая комната • QR link • realtime backend active";
+          return true;
+        }catch(err){
+          console.error(err);
+          state.demoMode = true;
+          setTransport("firebase error", "bad");
+          maybeShowSetupOverlay(true);
+          return false;
+        }
+      }
+
+      function maybeShowSetupOverlay(force = false){
+        if(force || (!state.firebaseReady && !state.demoBannerShown)){
+          state.demoBannerShown = true;
+          SELECTORS.setupOverlay.classList.add("show");
+        }
+      }
+
+      function closeSetupOverlay(){
+        SELECTORS.setupOverlay.classList.remove("show");
+      }
+
+      function openSetupOverlay(){
+        const stored = getStoredConfig();
+        SELECTORS.firebaseConfigInput.value = stored ? serializeConfig(stored) : "";
+        SELECTORS.setupOverlay.classList.add("show");
+      }
+
+      /* =========================================================
+         ROOM / PRESENCE / LISTENERS
+      ========================================================= */
+
+      function teardownRealtime(){
+        state.unsubs.forEach(unsub => {
+          try{ unsub && unsub(); }catch(_){}
+        });
+        state.unsubs = [];
+        state.membersRef = null;
+        state.messagesRef = null;
+        state.typingRef = null;
+        state.presenceRef = null;
+        state.roomRef = null;
+        state.filesRef = null;
+        state.isConnected = false;
+        setConnected(false);
+      }
+
+      function leaveRoom(reason = "left room"){
+        teardownRealtime();
+        stopLocalPoll();
+        state.seenMessageIds.clear();
+        state.messagesCache.clear();
+        state.queuedFiles = [];
+        SELECTORS.queuedFileList.innerHTML = "";
+        setRoomHeader(null);
+        setConnectionBadge("Ожидание", reason);
+        setStatus(reason, "warn");
+        SELECTORS.memberList.innerHTML = `<div class="tiny">Пока никого нет.</div>`;
+        SELECTORS.messages.innerHTML = "";
+        SELECTORS.messages.appendChild(SELECTORS.emptyState);
+        showEmptyState(true);
+        updateProgress(0,0);
+        SELECTORS.uiSent.textContent = "0 MB";
+        SELECTORS.uiReceived.textContent = "0 MB";
+        SELECTORS.btnCopyRoomLink.disabled = true;
+        SELECTORS.btnCopyLinkSide.disabled = true;
+        SELECTORS.btnOpenLinkNewTab.disabled = true;
+        SELECTORS.qrBox.innerHTML = `<span class="tiny">QR появится здесь</span>`;
+        SELECTORS.qrNote.textContent = "Создай комнату на компьютере или открой короткую ссылку в QR.";
+        SELECTORS.roomUrlFull.textContent = "";
+        SELECTORS.roomLinkInput.value = "";
+        SELECTORS.chatSubtitle.textContent = "Пока комната не активна";
+        SELECTORS.peerBadge.textContent = "пир: —";
+        SELECTORS.roleBadge.textContent = "роль: —";
+        SELECTORS.typingText.textContent = "Никто не печатает";
+        setTransport(state.demoMode ? "demo mode" : "firebase awaiting", state.demoMode ? "warn" : "warn");
+        localStorage.removeItem(APP.roomKey);
+      }
+
+      async function createRoom(){
+        const roomId = randomRoomId();
+        await enterRoom(roomId, { create: true });
+      }
+
+      async function joinFromUrlOrPrompt(){
+        const link = prompt("Вставь ссылку комнаты или короткий room code:");
+        if(!link) return;
+        const roomId = normalizeRoomId(link);
+        if(!roomId){
+          toast("Не удалось распознать комнату", "bad");
+          return;
+        }
+        await enterRoom(roomId, { create: false });
+      }
+
+      async function enterRoom(roomId, options = {}){
+        if(!roomId) return;
+        localStorage.setItem(APP.roomKey, roomId);
+        setRoomHeader(roomId);
+        updateUrlRoom(roomId, false);
+        state.roomCreatedAt = now();
+        state.roomUpdatedAt = now();
+
+        if(state.firebaseReady){
+          await enterFirebaseRoom(roomId, options);
+        }else{
+          state.demoMode = true;
+          await enterDemoRoom(roomId, options);
+        }
+
+        updateHeaderForRoom();
+      }
+
+      function updateHeaderForRoom(){
+        SELECTORS.uiConnection.textContent = state.roomId ? "Комната активна" : "Ожидание";
+        SELECTORS.uiConnectionSub.textContent = state.roomId ? "подключение и чат готовы" : "Комната ещё не создана";
+        SELECTORS.brandSub.textContent = state.roomId ? `room ${state.roomId} • link ready` : "закрытая комната • QR link • телефон ↔ ПК";
+      }
+
+      async function enterFirebaseRoom(roomId, options = {}){
+        try{
+          state.userRole = options.create ? "host" : "guest";
+          setRoomHeader(roomId);
+
+          state.roomRef = state.db.ref(roomPath(roomId));
+          state.messagesRef = state.db.ref(messagePath(roomId));
+          state.membersRef = state.db.ref(membersPath(roomId));
+          state.typingRef = state.db.ref(typingPath(roomId));
+          state.presenceRef = state.db.ref(presencePath(roomId));
+          state.filesRef = state.db.ref(filesPath(roomId));
+
+          const roomLink = makeRoomLink(roomId);
+
+          await state.roomRef.update({
+            roomId,
+            createdAt: state.roomCreatedAt || now(),
+            updatedAt: now(),
+            link: roomLink,
+            hostId: options.create ? state.userId : null
+          });
+
+          await state.membersRef.child(state.userId).set({
+            id: state.userId,
+            name: state.userName,
+            color: state.userColor,
+            role: state.userRole,
+            status: "online",
+            ts: now()
+          });
+
+          const onDisconnectMember = state.membersRef.child(state.userId).onDisconnect();
+          onDisconnectMember.remove();
+
+          await state.presenceRef.child(state.userId).set({
+            id: state.userId,
+            online: true,
+            ts: now(),
+            name: state.userName,
+            color: state.userColor
+          });
+
+          state.presenceRef.child(state.userId).onDisconnect().set({
+            id: state.userId,
+            online: false,
+            ts: now(),
+            name: state.userName,
+            color: state.userColor
+          });
+
+          const unsubMembers = state.membersRef.on("value", snap => {
+            const val = snap.val() || {};
+            const arr = Object.values(val);
+            renderMembers(arr);
+            if(arr.length > 0){
+              const others = arr.filter(x => x && x.id !== state.userId);
+              if(others.length){
+                SELECTORS.peerBadge.textContent = `пир: ${others.length}`;
+              }
+            }
+          });
+
+          const unsubTyping = state.typingRef.on("value", snap => {
+            const val = snap.val() || {};
+            renderTyping(val);
+          });
+
+          const unsubMessages = state.messagesRef.limitToLast(200).on("child_added", snap => {
+            const msg = snap.val();
+            if(!msg || state.seenMessageIds.has(msg.id)) return;
+            state.seenMessageIds.add(msg.id);
+            renderMessage(msg, msg.senderId === state.userId);
+            if(msg.senderId !== state.userId){
+              state.receivedBytes += msg.sizeBytes || 0;
+              SELECTORS.uiReceived.textContent = fmtBytes(state.receivedBytes);
+            }
+            ensureMessagesVisible();
+          });
+
+          state.unsubs.push(() => state.membersRef && state.membersRef.off("value", unsubMembers));
+          state.unsubs.push(() => state.typingRef && state.typingRef.off("value", unsubTyping));
+          state.unsubs.push(() => state.messagesRef && state.messagesRef.off("child_added", unsubMessages));
+
+          const greet = options.create
+            ? `Комната ${roomId} создана`
+            : `Вход в комнату ${roomId}`;
+
+          await sendSystem(greet);
+          setConnectionBadge("Подключено", options.create ? "Комната создана" : "Комната открыта");
+          setStatus("Комната открыта", "ok");
+          setTransport("firebase realtime", "ok");
+          setConnected(true);
+
+          if(options.create){
+            generateRoomQR(roomLink);
+            toast("QR готов", "good");
+          }
+
+          loadDraft();
+          startTypingHeartbeat();
+
+        }catch(err){
+          console.error(err);
+          state.demoMode = true;
+          setTransport("firebase fallback", "bad");
+          await enterDemoRoom(roomId, options);
+        }
+      }
+
+      async function enterDemoRoom(roomId, options = {}){
+        state.userRole = options.create ? "host" : "guest";
+        state.roomId = roomId;
+        setRoomHeader(roomId);
+        state.localRoom = roomId;
+        localJoinRoom(roomId);
+        setTransport("local demo", "warn");
+        setConnectionBadge("Локальная демонстрация", "Для реального обмена нужен Firebase");
+        setStatus("Локальный режим", "warn");
+        setConnected(true);
+        const roomLink = makeRoomLink(roomId);
+        generateRoomQR(roomLink);
+        renderMembers([
+          {
+            id: state.userId,
+            name: state.userName,
+            color: state.userColor,
+            role: state.userRole,
+            status: "online"
+          }
+        ]);
+        const msgs = localRoomMessages();
+        SELECTORS.messages.innerHTML = "";
+        SELECTORS.messages.appendChild(SELECTORS.emptyState);
+        msgs.forEach(msg => renderMessage(msg, msg.senderId === state.userId));
+        ensureMessagesVisible();
+        loadDraft();
+        startTypingHeartbeat();
+      }
+
+      function startTypingHeartbeat(){
+        clearInterval(state.typingHeartbeat);
+        state.typingHeartbeat = setInterval(() => {
+          if(!state.roomId) return;
+          if(state.demoMode){
+            localSetTyping(state.userId, false);
+          }else if(state.typingRef){
+            state.typingRef.child(state.userId).set({
+              id: state.userId,
+              name: state.userName,
+              color: state.userColor,
+              active: false,
+              ts: now()
+            }).catch(()=>{});
+          }
+        }, 8000);
+      }
+
+      function renderMembers(members){
+        const filtered = (members || []).filter(Boolean);
+        SELECTORS.memberList.innerHTML = "";
+        if(!filtered.length){
+          SELECTORS.memberList.innerHTML = `<div class="tiny">Пока никого нет.</div>`;
+          return;
+        }
+        filtered.sort((a,b) => (b.ts || 0) - (a.ts || 0));
+        filtered.slice(0, 8).forEach(member => {
+          SELECTORS.memberList.appendChild(renderMemberChip(member));
+        });
+        const me = filtered.find(x => x.id === state.userId);
+        if(me){
+          SELECTORS.roleBadge.textContent = `роль: ${me.role || state.userRole}`;
+        }
+      }
+
+      function renderTyping(data){
+        const arr = Object.values(data || {})
+          .filter(x => x && x.id !== state.userId && x.active);
+        if(!arr.length){
+          setTypingText("Никто не печатает");
+          return;
+        }
+        if(arr.length === 1){
+          setTypingText(`${arr[0].name || "User"} печатает...`);
+          return;
+        }
+        setTypingText(`${arr[0].name || "User"} и ещё ${arr.length - 1} печатают...`);
+      }
+
+      function renderMessage(msg, mine = false){
+        if(!msg || !msg.id) return;
+        ensureMessagesVisible();
+        if(SELECTORS.emptyState.parentElement){
+          SELECTORS.emptyState.remove();
+        }
+        const node = buildMessageNode(msg);
+        SELECTORS.messages.appendChild(node);
+        bindAttachmentButtons(node);
+        if(mine || isNearBottom(SELECTORS.messages)){
+          scrollToBottom(true);
+        }
+      }
+
+      function bindAttachmentButtons(node){
+        node.querySelectorAll("[data-download]").forEach(btn => {
+          btn.addEventListener("click", () => {
+            const url = btn.getAttribute("data-download");
+            const name = btn.getAttribute("data-name") || "file";
+            if(url) downloadHref(name, url);
+          });
+        });
+      }
+
+      async function sendSystem(text){
+        const msg = {
+          id: `sys_${uid(14)}`,
+          type: "system",
+          senderId: "system",
+          senderName: "System",
+          senderColor: COLORS.blue,
+          ts: now(),
+          text,
+          sizeBytes: 0
+        };
+        if(state.demoMode){
+          localPushMessage(msg);
+          renderMessage(msg, false);
+          return msg;
+        }
+        await state.messagesRef.child(msg.id).set(msg);
+        return msg;
+      }
+
+      async function sendTyping(active){
+        if(!state.roomId) return;
+        const payload = {
+          id: state.userId,
+          name: state.userName,
+          color: state.userColor,
+          active: !!active,
+          ts: now()
+        };
+        if(state.demoMode){
+          localSetTyping(state.userId, active);
+          refreshTypingFromLocal();
+          return;
+        }
+        if(!state.typingRef) return;
+        await state.typingRef.child(state.userId).set(payload);
+      }
+
+      function scheduleTyping(active = true){
+        clearTimeout(state.typingDebounce);
+        clearTimeout(state.typingTimer);
+        state.typingDebounce = setTimeout(() => sendTyping(active).catch(()=>{}), 80);
+        state.typingTimer = setTimeout(() => sendTyping(false).catch(()=>{}), 1800);
+      }
+
+      async function sendTextMessage(){
+        const text = String(SELECTORS.messageInput.value || "").trimEnd();
+        if(!text.trim()) return;
+        if(!state.roomId){
+          toast("Сначала создай или открой комнату", "warn");
+          return;
+        }
+
+        const msg = {
+          id: uid(16),
+          type: "text",
+          senderId: state.userId,
+          senderName: state.userName,
+          senderColor: state.userColor,
+          ts: now(),
+          text,
+          sizeBytes: new Blob([text]).size
+        };
+
+        state.sentBytes += msg.sizeBytes;
+        SELECTORS.uiSent.textContent = fmtBytes(state.sentBytes);
+        updateProgress(state.sentBytes, state.totalBytes || state.sentBytes);
+
+        if(state.demoMode){
+          localPushMessage(msg);
+          renderMessage(msg, true);
+          setDraftText("");
+          await sendTyping(false);
+          return;
+        }
+
+        await state.messagesRef.child(msg.id).set(msg);
+        renderMessage(msg, true);
+        setDraftText("");
+        await sendTyping(false);
+      }
+
+      async function uploadSingleFile(file){
+        const path = `rooms/${state.roomId}/uploads/${state.userId}/${now()}_${fileNameOnly(file.name)}`;
+        const metadata = {
+          customMetadata: {
+            roomId: state.roomId,
+            senderId: state.userId,
+            senderName: state.userName,
+            senderColor: state.userColor,
+            originalName: file.name,
+            mime: file.type || "application/octet-stream"
+          }
+        };
+        const uploadTask = state.storage.ref(path).put(file, metadata);
+        state.uploadJobs.set(file.name, uploadTask);
+
+        return new Promise((resolve, reject) => {
+          uploadTask.on("state_changed",
+            snap => {
+              const frac = snap.totalBytes ? snap.bytesTransferred / snap.totalBytes : 0;
+              const loaded = snap.bytesTransferred || 0;
+              state.sentBytes += loaded > 0 ? 0 : 0;
+              updateProgress(state.sentBytes + loaded, state.totalBytes + file.size);
+            },
+            reject,
+            async () => {
+              try{
+                const url = await uploadTask.snapshot.ref.getDownloadURL();
+                resolve({ url, path });
+              }catch(err){
+                reject(err);
+              }
+            }
+          );
+        });
+      }
+
+      async function sendQueuedFiles(){
+        if(!state.roomId || !state.isConnected){
+          toast("Сначала открой комнату", "warn");
+          return;
+        }
+        const files = [...state.queuedFiles];
+        if(!files.length) return;
+
+        for(const file of files){
+          try{
+            if(state.demoMode){
+              await sendLocalFile(file);
+              continue;
+            }
+
+            const uploaded = await uploadSingleFile(file);
+            const msg = {
+              id: uid(16),
+              type: "file",
+              senderId: state.userId,
+              senderName: state.userName,
+              senderColor: state.userColor,
+              ts: now(),
+              file: {
+                name: file.name,
+                size: file.size,
+                type: file.type || "application/octet-stream",
+                url: uploaded.url,
+                path: uploaded.path,
+                icon: fileIconType(file.type, file.name)
+              },
+              sizeBytes: file.size
+            };
+
+            state.sentBytes += file.size;
+            SELECTORS.uiSent.textContent = fmtBytes(state.sentBytes);
+            updateProgress(state.sentBytes, state.totalBytes + file.size);
+
+            await state.messagesRef.child(msg.id).set(msg);
+            renderMessage(msg, true);
+          }catch(err){
+            console.error(err);
+            toast(`Ошибка файла: ${file.name}`, "bad");
+          }
+        }
+
+        clearQueuedFiles();
+        scrollToBottom(true);
+      }
+
+      async function sendLocalFile(file){
+        const url = URL.createObjectURL(file);
+        const msg = {
+          id: uid(16),
+          type: "file",
+          senderId: state.userId,
+          senderName: state.userName,
+          senderColor: state.userColor,
+          ts: now(),
+          file: {
+            name: file.name,
+            size: file.size,
+            type: file.type || "application/octet-stream",
+            url,
+            path: "local://",
+            icon: fileIconType(file.type, file.name)
+          },
+          sizeBytes: file.size
+        };
+
+        state.sentBytes += file.size;
+        SELECTORS.uiSent.textContent = fmtBytes(state.sentBytes);
+        updateProgress(state.sentBytes, state.totalBytes + file.size);
+
+        localPushMessage(msg);
+        renderMessage(msg, true);
+        clearQueuedFiles();
+      }
+
+      function loadDraft(){
+        const txt = localStorage.getItem(APP.draftKey) || "";
+        if(txt) setDraftText(txt);
+      }
+
+      function saveDraft(){
+        localStorage.setItem(APP.draftKey, String(SELECTORS.messageInput.value || ""));
+      }
+
+      async function copyRoomLink(){
+        if(!state.roomId) return;
+        const link = makeRoomLink(state.roomId);
+        await copyText(link);
+        toast("Ссылка скопирована", "good");
+      }
+
+      function openRoomLink(){
+        if(!state.roomId) return;
+        window.open(makeRoomLink(state.roomId), "_blank", "noopener,noreferrer");
+      }
+
+      function generateRoomQR(link){
+        const short = state.roomId ? state.roomId.toUpperCase() : "—";
+        SELECTORS.roomUrlFull.textContent = link;
+        SELECTORS.roomLinkInput.value = link;
+        SELECTORS.qrBox.innerHTML = "";
+        createQR(SELECTORS.qrBox, link, 220);
+        SELECTORS.qrNote.textContent = `Сканируй QR телефоном. Комната ${short} откроется автоматически.`;
+        SELECTORS.btnCopyRoomLink.disabled = false;
+        SELECTORS.btnCopyLinkSide.disabled = false;
+        SELECTORS.btnOpenLinkNewTab.disabled = false;
+        SELECTORS.qrBox.onclick = () => openOverlayQR(link);
+        SELECTORS.roomLinkInput.readOnly = true;
+      }
+
+      function openOverlayQR(link){
+        state.overlayQR = link;
+        SELECTORS.overlay.classList.add("show");
+        SELECTORS.overlayTitle.textContent = `QR комнаты ${state.roomId ? state.roomId.toUpperCase() : ""}`;
+        SELECTORS.overlaySubtitle.textContent = "Открытая ссылка комнаты для быстрого сканирования";
+        SELECTORS.overlayStage.innerHTML = "";
+        createQR(SELECTORS.overlayStage, link, 420);
+      }
+
+      function closeOverlay(){
+        SELECTORS.overlay.classList.remove("show");
+      }
+
+      function showTips(){
+        alert(
+`Как пользоваться:
+1. Создай комнату на ПК.
+2. Сканируй QR телефоном.
+3. Телефон откроет сайт и сразу попадет в комнату.
+4. Пиши текст, кидай фото, видео и файлы.
+5. Если Firebase не настроен, открой меню Firebase и вставь конфиг.
+
+Для реального realtime нужен Firebase Realtime Database + Storage + Anonymous Auth.`
+        );
+      }
+
+      function joinFromCurrentUrl(){
+        const roomId = getCurrentRoomFromUrl() || localStorage.getItem(APP.roomKey);
+        if(roomId){
+          enterRoom(roomId, { create: false });
+        }else{
+          toast("В ссылке не найден room", "warn");
+        }
+      }
+
+      function setupLocalUi(){
+        restorePrefs();
+        const profile = getUserProfile();
+        state.userId = profile.id;
+        state.userName = profile.name;
+        state.userColor = profile.color;
+        SELECTORS.brandSub.textContent = "закрытая комната • QR link • телефон ↔ ПК";
+        setTransport("awaiting backend", "warn");
+        setStatus("Ожидание", "warn");
+        setConnected(false);
+        setRoomHeader(null);
+        showEmptyState(true);
+        renderMembers([]);
+        clearQueuedFiles();
+        updateProgress(0,0);
+        setTypingText("Никто не печатает");
+        SELECTORS.messageInput.value = localStorage.getItem(APP.draftKey) || "";
+      }
+
+      function bindComposer(){
+        SELECTORS.messageInput.addEventListener("input", () => {
+          state.draft = SELECTORS.messageInput.value;
+          saveDraft();
+          scheduleTyping(!!state.draft.trim());
+        });
+
+        SELECTORS.messageInput.addEventListener("keydown", (e) => {
+          if((e.ctrlKey || e.metaKey) && e.key === "Enter"){
+            e.preventDefault();
+            sendTextMessage();
+          }
+        });
+      }
+
+      function bindFileDrop(){
+        SELECTORS.dropzone.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          SELECTORS.dropzone.classList.add("drag");
+        });
+
+        SELECTORS.dropzone.addEventListener("dragleave", () => {
+          SELECTORS.dropzone.classList.remove("drag");
+        });
+
+        SELECTORS.dropzone.addEventListener("drop", (e) => {
+          e.preventDefault();
+          SELECTORS.dropzone.classList.remove("drag");
+          if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length){
+            addQueuedFiles(e.dataTransfer.files);
+          }
+        });
+      }
+
+      function bindButtons(){
+        SELECTORS.btnOverlayClose.addEventListener("click", closeOverlay);
+        SELECTORS.overlay.addEventListener("click", (e) => {
+          if(e.target === SELECTORS.overlay) closeOverlay();
+        });
+
+        SELECTORS.btnOpenSetup.addEventListener("click", openSetupOverlay);
+        SELECTORS.btnSetupClose.addEventListener("click", closeSetupOverlay);
+        SELECTORS.setupOverlay.addEventListener("click", (e) => {
+          if(e.target === SELECTORS.setupOverlay) closeSetupOverlay();
+        });
+
+        SELECTORS.btnSaveFirebaseConfig.addEventListener("click", async () => {
+          try{
+            const cfg = parseConfig(SELECTORS.firebaseConfigInput.value.trim());
+            saveStoredConfig(cfg);
+            closeSetupOverlay();
+            toast("Конфиг сохранён", "good");
+            await rebootBackend();
+          }catch(err){
+            console.error(err);
+            toast("Неверный JSON", "bad");
+          }
+        });
+
+        SELECTORS.btnUseDemo.addEventListener("click", () => {
+          state.demoMode = true;
+          localStorage.setItem(APP.demoKey, "1");
+          closeSetupOverlay();
+          toast("Демо режим включён", "warn");
+        });
+
+        SELECTORS.btnCreateRoom.addEventListener("click", createRoom);
+        SELECTORS.btnCreateRoomHero.addEventListener("click", createRoom);
+        SELECTORS.btnJoinFromUrl.addEventListener("click", joinFromUrlOrPrompt);
+        SELECTORS.btnLeaveRoom.addEventListener("click", () => leaveRoom("room closed"));
+        SELECTORS.btnCopyRoomLink.addEventListener("click", copyRoomLink);
+        SELECTORS.btnCopyLinkSide.addEventListener("click", copyRoomLink);
+        SELECTORS.btnOpenLinkNewTab.addEventListener("click", openRoomLink);
+
+        SELECTORS.btnPasteRoomLink.addEventListener("click", async () => {
+          try{
+            const text = await pasteText();
+            const roomId = normalizeRoomId(text);
+            if(roomId){
+              await enterRoom(roomId, { create: false });
+            }else{
+              toast("Не удалось распознать ссылку", "bad");
+            }
+          }catch(err){
+            toast("Буфер обмена недоступен", "warn");
+          }
+        });
+
+        SELECTORS.btnShowTips.addEventListener("click", showTips);
+
+        SELECTORS.btnSendText.addEventListener("click", sendTextMessage);
+        SELECTORS.btnCopyDraft.addEventListener("click", async () => {
+          await copyText(SELECTORS.messageInput.value || "");
+          toast("Черновик скопирован", "good");
+        });
+        SELECTORS.btnScrollBottom.addEventListener("click", () => scrollToBottom(true));
+        SELECTORS.btnClearDraft.addEventListener("click", () => setDraftText(""));
+
+        SELECTORS.btnToggleMobileView.addEventListener("click", applyMobileView);
+        SELECTORS.btnTheme.addEventListener("click", toggleThemeGlow);
+
+        SELECTORS.btnPickFiles.addEventListener("click", () => SELECTORS.fileInput.click());
+        SELECTORS.fileInput.addEventListener("change", () => {
+          addQueuedFiles(SELECTORS.fileInput.files);
+          SELECTORS.fileInput.value = "";
+        });
+
+        SELECTORS.btnSendQueuedFiles.addEventListener("click", sendQueuedFiles);
+
+        SELECTORS.qrBox.addEventListener("click", () => {
+          if(!state.roomId || !state.roomLinkInput.value) return;
+          openOverlayQR(state.roomLinkInput.value);
+        });
+
+        window.addEventListener("resize", () => {
+          if(state.roomId && SELECTORS.qrBox.children.length === 0 && state.roomLinkInput.value){
+            generateRoomQR(state.roomLinkInput.value);
+          }
+        });
+
+        window.addEventListener("popstate", () => {
+          const room = getCurrentRoomFromUrl();
+          if(room && room !== state.roomId){
+            enterRoom(room, { create: false });
+          }
+        });
+      }
+
+      async function rebootBackend(){
+        teardownRealtime();
+        stopLocalPoll();
+        state.firebaseReady = false;
+        await initFirebaseIfPossible();
+        const room = getCurrentRoomFromUrl() || localStorage.getItem(APP.roomKey);
+        if(room){
+          await enterRoom(room, { create: false });
+        }
+      }
+
+      async function initFromUrlOrStorage(){
+        const urlRoom = getCurrentRoomFromUrl();
+        const storedRoom = localStorage.getItem(APP.roomKey);
+        const room = urlRoom || storedRoom;
+        if(room){
+          await enterRoom(room, { create: false });
+        }
+      }
+
+      function bindKeyboardShortcuts(){
+        document.addEventListener("keydown", (e) => {
+          if(e.key === "Escape"){
+            closeOverlay();
+            closeSetupOverlay();
+          }
+
+          if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k"){
+            e.preventDefault();
+            SELECTORS.messageInput.focus();
+          }
+
+          if((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "l"){
+            e.preventDefault();
+            copyRoomLink().catch(()=>{});
+          }
+        });
+      }
+
+      /* =========================================================
+         BOOT
+      ========================================================= */
+
+      async function boot(){
+        setupLocalUi();
+        bindComposer();
+        bindFileDrop();
+        bindButtons();
+        bindKeyboardShortcuts();
+
+        const cfg = getStoredConfig();
+        if(cfg){
+          SELECTORS.firebaseConfigInput.value = serializeConfig(cfg);
+        }
+
+        if(!navigator.onLine){
+          setTransport("offline", "warn");
+        }
+
+        await initFirebaseIfPossible();
+
+        const room = getCurrentRoomFromUrl() || localStorage.getItem(APP.roomKey);
+        if(room){
+          await enterRoom(room, { create: false });
+        }else{
+          setTransport(state.demoMode ? "demo mode" : "firebase ready", state.demoMode ? "warn" : "ok");
+        }
+
+        SELECTORS.btnSendText.disabled = true;
+        SELECTORS.btnSendQueuedFiles.disabled = true;
+        state.initialized = true;
+
+        if(state.demoMode && !cfg){
+          maybeShowSetupOverlay(true);
+        }
+
+        if(state.firebaseReady){
+          setConnectionBadge("Firebase ready", "room backend online");
+          setStatus("Firebase готов", "ok");
+        }else{
+          setConnectionBadge("Демо-режим", "backend missing");
+        }
+
+        const cached = localStorage.getItem(APP.draftKey) || "";
+        if(cached) setDraftText(cached);
+
+        if(state.roomId){
+          setRoomHeader(state.roomId);
+          updateHeaderForRoom();
+        }
+
+        showEmptyState(true);
+
+        // tiny intro message after boot
+        setTimeout(() => {
+          if(!state.roomId){
+            renderMessage(systemMessage("Создай комнату или открой ссылку из QR."), false);
+          }
+        }, 450);
+      }
+
+      /* =========================================================
+         GLOBAL HELPERS / PUBLIC
+      ========================================================= */
+
+      window.ShadowDrop = {
+        createRoom,
+        enterRoom,
+        leaveRoom,
+        openSetupOverlay,
+        closeSetupOverlay,
+        copyRoomLink,
+        sendTextMessage,
+        sendQueuedFiles,
+        rebootBackend
+      };
+
+      document.getElementById("btnCopyRoomLinkSide").disabled = true;
+
+      boot().catch(err => {
+        console.error(err);
+        setStatus("Ошибка запуска", "bad");
+        setTransport("startup failed", "bad");
+        renderMessage(systemMessage("Ошибка запуска приложения. Открой Firebase настройки или обнови страницу."), false);
+      });
+
+    })();
+  </script>
+</body>
+</html>
