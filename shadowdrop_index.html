@@ -1,0 +1,834 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ShadowDrop — transfer hub</title>
+  <style>
+    :root{
+      --bg:#0a0b10;
+      --bg2:#10131a;
+      --card:#11151d;
+      --card2:#151b25;
+      --line:rgba(255,255,255,.08);
+      --text:#e9edf7;
+      --muted:#9aa3b2;
+      --accent:#8b5cf6;
+      --accent2:#22d3ee;
+      --ok:#34d399;
+      --warn:#f59e0b;
+      --bad:#ef4444;
+      --shadow:0 24px 80px rgba(0,0,0,.45);
+      --radius:28px;
+    }
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family:Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(139,92,246,.24), transparent 28%),
+        radial-gradient(circle at top right, rgba(34,211,238,.18), transparent 26%),
+        linear-gradient(180deg, #07080c 0%, #0a0b10 42%, #06070b 100%);
+      overflow-x:hidden;
+    }
+    .wrap{max-width:1240px;margin:0 auto;padding:28px 18px 42px}
+    .hero{
+      display:grid;
+      grid-template-columns:1.1fr .9fr;
+      gap:18px;
+      align-items:stretch;
+      margin-bottom:18px;
+    }
+    .panel{
+      background:linear-gradient(180deg, rgba(255,255,255,.035), rgba(255,255,255,.018));
+      border:1px solid var(--line);
+      box-shadow:var(--shadow);
+      backdrop-filter:blur(14px);
+      border-radius:var(--radius);
+      overflow:hidden;
+    }
+    .hero-main{padding:28px}
+    .brand{
+      display:inline-flex;align-items:center;gap:10px;
+      padding:10px 14px;border-radius:999px;
+      background:rgba(139,92,246,.14);
+      border:1px solid rgba(139,92,246,.26);
+      color:#dcd4ff;font-weight:700;letter-spacing:.4px;
+      margin-bottom:18px;
+    }
+    .dot{width:11px;height:11px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));box-shadow:0 0 18px rgba(139,92,246,.55)}
+    h1{font-size:clamp(34px,5vw,60px);line-height:1.02;margin:0 0 14px}
+    .lead{font-size:clamp(15px,1.5vw,18px);line-height:1.6;color:var(--muted);max-width:66ch;margin:0 0 22px}
+    .chips{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:22px}
+    .chip{
+      padding:9px 12px;border-radius:999px;background:rgba(255,255,255,.04);
+      border:1px solid var(--line);color:#d6dbe6;font-size:13px
+    }
+    .actions{display:flex;flex-wrap:wrap;gap:12px}
+    button, .btn, input, textarea, select{
+      font:inherit;
+    }
+    .btn{
+      appearance:none;border:none;cursor:pointer;
+      border-radius:18px;padding:13px 16px;
+      color:var(--text);background:rgba(255,255,255,.04);
+      border:1px solid var(--line);
+      transition:.18s transform,.18s border-color,.18s background;
+      display:inline-flex;align-items:center;gap:10px;
+      text-decoration:none;
+    }
+    .btn:hover{transform:translateY(-1px);border-color:rgba(255,255,255,.18);background:rgba(255,255,255,.06)}
+    .btn.primary{
+      background:linear-gradient(135deg, rgba(139,92,246,.95), rgba(34,211,238,.85));
+      border-color:transparent;
+      color:#071018;
+      font-weight:800;
+    }
+    .btn.good{background:rgba(52,211,153,.12);border-color:rgba(52,211,153,.28)}
+    .btn.danger{background:rgba(239,68,68,.1);border-color:rgba(239,68,68,.26)}
+    .hero-side{padding:22px;display:grid;gap:12px;align-content:start}
+    .statgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .stat{
+      padding:16px;border-radius:22px;background:rgba(255,255,255,.04);
+      border:1px solid var(--line)
+    }
+    .stat .k{font-size:12px;color:var(--muted);margin-bottom:8px}
+    .stat .v{font-size:22px;font-weight:800}
+    .main{
+      display:grid;
+      grid-template-columns:360px 1fr;
+      gap:18px;
+      align-items:start;
+    }
+    .sidebar,.workspace{padding:18px}
+    .section-title{
+      display:flex;align-items:center;justify-content:space-between;gap:10px;
+      margin-bottom:14px
+    }
+    .section-title h2{margin:0;font-size:18px}
+    .badge{
+      font-size:12px;padding:7px 10px;border-radius:999px;
+      background:rgba(34,211,238,.1);border:1px solid rgba(34,211,238,.22);color:#bff5ff
+    }
+    .field{
+      display:grid;gap:8px;margin-bottom:14px
+    }
+    label{font-size:13px;color:#cad2df}
+    input[type="text"], textarea, select{
+      width:100%;
+      background:rgba(7,9,13,.65);
+      color:var(--text);
+      border:1px solid var(--line);
+      border-radius:18px;
+      padding:13px 14px;
+      outline:none;
+    }
+    textarea{min-height:120px;resize:vertical}
+    input:focus, textarea:focus, select:focus{
+      border-color:rgba(139,92,246,.5);
+      box-shadow:0 0 0 4px rgba(139,92,246,.12)
+    }
+    .meta{
+      display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;
+      color:var(--muted);font-size:12px;margin-top:6px
+    }
+    .box{
+      padding:16px;border-radius:22px;background:rgba(255,255,255,.035);border:1px solid var(--line)
+    }
+    .drop{
+      border:1.5px dashed rgba(255,255,255,.16);
+      border-radius:24px;
+      min-height:160px;
+      display:grid;
+      place-items:center;
+      text-align:center;
+      padding:20px;
+      background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.05));
+      transition:.18s border-color,.18s transform,.18s background;
+    }
+    .drop.drag{border-color:rgba(34,211,238,.55);transform:scale(1.01);background:rgba(34,211,238,.06)}
+    .drop strong{font-size:17px}
+    .drop p{color:var(--muted);margin:10px 0 0;line-height:1.5}
+    .list{display:grid;gap:10px;margin-top:12px}
+    .item{
+      display:flex;justify-content:space-between;gap:12px;align-items:center;
+      background:rgba(255,255,255,.035);border:1px solid var(--line);
+      border-radius:18px;padding:12px 14px
+    }
+    .item .name{font-weight:700}
+    .item .sub{font-size:12px;color:var(--muted);margin-top:3px}
+    .pill{
+      font-size:12px;padding:6px 9px;border-radius:999px;background:rgba(255,255,255,.05);color:#d7deea
+    }
+    .status{
+      display:flex;align-items:center;gap:8px;
+      font-size:13px;color:var(--muted)
+    }
+    .status .led{width:10px;height:10px;border-radius:50%;background:#6b7280;box-shadow:0 0 0 3px rgba(255,255,255,.04)}
+    .status.ok .led{background:var(--ok);box-shadow:0 0 0 3px rgba(52,211,153,.12)}
+    .status.bad .led{background:var(--bad);box-shadow:0 0 0 3px rgba(239,68,68,.12)}
+    .status.warn .led{background:var(--warn);box-shadow:0 0 0 3px rgba(245,158,11,.12)}
+    .progress{
+      width:100%;height:11px;border-radius:999px;overflow:hidden;
+      background:rgba(255,255,255,.06);border:1px solid var(--line);
+    }
+    .bar{height:100%;width:0%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .18s}
+    .log{
+      height:160px;overflow:auto;padding-right:6px;
+      display:grid;gap:8px
+    }
+    .log .msg{
+      font-size:13px;line-height:1.45;padding:10px 12px;border-radius:14px;
+      background:rgba(255,255,255,.04);border:1px solid var(--line);color:#dfe5ef
+    }
+    .muted{color:var(--muted)}
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+    .preview{
+      display:grid;gap:10px
+    }
+    .preview img, .preview video{
+      width:100%;border-radius:20px;border:1px solid var(--line);background:#000;max-height:340px;object-fit:contain
+    }
+    .footer{
+      margin-top:18px;
+      color:var(--muted);font-size:12px;text-align:center;line-height:1.6
+    }
+    .codebox{
+      white-space:pre-wrap;
+      word-break:break-word;
+      max-height:170px;
+      overflow:auto;
+      font-family:ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size:12px;
+      background:rgba(6,8,12,.72);
+      border:1px solid var(--line);
+      padding:12px;
+      border-radius:16px;
+    }
+    @media (max-width: 980px){
+      .hero,.main{grid-template-columns:1fr}
+    }
+    @media (max-width: 640px){
+      .wrap{padding:14px}
+      .hero-main,.hero-side,.sidebar,.workspace{padding:16px}
+      .actions,.grid2,.statgrid{grid-template-columns:1fr}
+      .actions,.grid2{display:grid}
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="hero">
+      <div class="panel hero-main">
+        <div class="brand"><span class="dot"></span> ShadowDrop • phone ↔ PC transfer</div>
+        <h1>Пересылай всё. Текст, код, фото, файлы, видео — без лишнего шума.</h1>
+        <p class="lead">
+          Это статический сайт под GitHub Pages. Он работает как прямой браузерный канал передачи: открываешь на двух устройствах, связываешь их кодом комнаты и кидаешь данные по WebRTC.
+        </p>
+        <div class="chips">
+          <span class="chip">Тёмный интерфейс</span>
+          <span class="chip">Drag &amp; drop</span>
+          <span class="chip">Текст и код</span>
+          <span class="chip">Любые файлы</span>
+          <span class="chip">Видео и фото</span>
+          <span class="chip">Мобильный UI</span>
+        </div>
+        <div class="actions">
+          <button class="btn primary" id="btnCreate">Создать комнату</button>
+          <button class="btn" id="btnCopyOffer" disabled>Скопировать код</button>
+          <button class="btn good" id="btnConnect">Подключиться</button>
+          <button class="btn danger" id="btnReset">Сбросить</button>
+        </div>
+      </div>
+
+      <div class="panel hero-side">
+        <div class="statgrid">
+          <div class="stat">
+            <div class="k">Статус</div>
+            <div class="v" id="uiConn">Ожидание</div>
+          </div>
+          <div class="stat">
+            <div class="k">Пир</div>
+            <div class="v" id="uiPeer">—</div>
+          </div>
+          <div class="stat">
+            <div class="k">Передано</div>
+            <div class="v" id="uiSent">0 MB</div>
+          </div>
+          <div class="stat">
+            <div class="k">Получено</div>
+            <div class="v" id="uiRecv">0 MB</div>
+          </div>
+        </div>
+        <div class="box">
+          <div class="status warn" id="connStatus"><span class="led"></span><span>Комната не создана</span></div>
+          <div class="meta" style="margin-top:12px">
+            <span>Совет: открый сайт на телефоне и ПК</span>
+            <span>Код можно вставить вручную</span>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="main">
+      <aside class="panel sidebar">
+        <div class="section-title">
+          <h2>Связь</h2>
+          <span class="badge">1:1 direct</span>
+        </div>
+
+        <div class="field">
+          <label for="roomCode">Код комнаты / SDP</label>
+          <textarea id="roomCode" placeholder="Нажми “Создать комнату”, потом скинь этот код на другое устройство."></textarea>
+          <div class="actions">
+            <button class="btn" id="btnPaste">Вставить</button>
+            <button class="btn" id="btnClearCode">Очистить</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="mode">Режим</label>
+          <select id="mode">
+            <option value="text">Текст / код</option>
+            <option value="files">Файлы</option>
+            <option value="mixed">Смешанный</option>
+          </select>
+        </div>
+
+        <div class="field">
+          <label>Лог</label>
+          <div class="log" id="log"></div>
+        </div>
+
+        <div class="field">
+          <label>Прогресс передачи</label>
+          <div class="progress"><div class="bar" id="bar"></div></div>
+          <div class="meta"><span id="progressText">0%</span><span id="trafficText">0 / 0</span></div>
+        </div>
+      </aside>
+
+      <section class="panel workspace">
+        <div class="section-title">
+          <h2>Отправка</h2>
+          <span class="badge">быстро и чисто</span>
+        </div>
+
+        <div class="grid2">
+          <div class="field">
+            <label for="textBox">Текст / код</label>
+            <textarea id="textBox" placeholder="Вставь текст, код, ссылки, заметки..."></textarea>
+            <div class="actions">
+              <button class="btn primary" id="btnSendText" disabled>Отправить текст</button>
+              <button class="btn" id="btnCopyText">Копировать текст</button>
+            </div>
+            <div class="meta"><span>Поддерживает любой Unicode</span><span>Вставка с телефона тоже работает</span></div>
+          </div>
+
+          <div class="field">
+            <label>Файлы</label>
+            <div class="drop" id="dropZone">
+              <div>
+                <strong>Перетащи файлы сюда</strong>
+                <p>Или выбери их кнопкой ниже. Можно фото, видео, архивы, документы — почти всё, что браузер умеет читать.</p>
+              </div>
+            </div>
+            <div class="actions" style="margin-top:12px">
+              <input id="filePick" type="file" multiple hidden />
+              <button class="btn primary" id="btnPick" disabled>Выбрать файлы</button>
+              <button class="btn" id="btnSendFiles" disabled>Отправить выбранное</button>
+            </div>
+            <div class="list" id="fileList"></div>
+          </div>
+        </div>
+
+        <div class="field" style="margin-top:4px">
+          <label>Полученные данные</label>
+          <div class="list" id="receivedList"></div>
+        </div>
+
+        <div class="field">
+          <label>Предпросмотр</label>
+          <div class="preview" id="preview"></div>
+        </div>
+      </section>
+    </section>
+
+    <div class="footer">
+      Для GitHub Pages это удобно: просто залей index.html. Для связи нужны два открытых браузера и один и тот же код комнаты.
+    </div>
+  </div>
+
+<script>
+(() => {
+  const $ = (id) => document.getElementById(id);
+  const els = {
+    connStatus: $('connStatus'),
+    uiConn: $('uiConn'),
+    uiPeer: $('uiPeer'),
+    uiSent: $('uiSent'),
+    uiRecv: $('uiRecv'),
+    log: $('log'),
+    bar: $('bar'),
+    progressText: $('progressText'),
+    trafficText: $('trafficText'),
+    roomCode: $('roomCode'),
+    textBox: $('textBox'),
+    mode: $('mode'),
+    filePick: $('filePick'),
+    fileList: $('fileList'),
+    receivedList: $('receivedList'),
+    preview: $('preview'),
+    dropZone: $('dropZone'),
+    btnCreate: $('btnCreate'),
+    btnConnect: $('btnConnect'),
+    btnReset: $('btnReset'),
+    btnCopyOffer: $('btnCopyOffer'),
+    btnPaste: $('btnPaste'),
+    btnClearCode: $('btnClearCode'),
+    btnSendText: $('btnSendText'),
+    btnCopyText: $('btnCopyText'),
+    btnPick: $('btnPick'),
+    btnSendFiles: $('btnSendFiles'),
+  };
+
+  let pc = null;
+  let dc = null;
+  let localStream = null;
+  let currentMode = 'text';
+  let pendingFiles = [];
+  let selectedFiles = [];
+  let transferQueue = [];
+  let receiving = null;
+  let receivedBytes = 0;
+  let sentBytes = 0;
+  let totalToSend = 0;
+  let totalToReceive = 0;
+  let connected = false;
+  const activeBlobs = [];
+
+  function log(msg) {
+    const el = document.createElement('div');
+    el.className = 'msg';
+    el.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+    els.log.prepend(el);
+  }
+
+  function setStatus(type, text) {
+    els.connStatus.className = 'status ' + (type || '');
+    els.connStatus.innerHTML = '<span class="led"></span><span>' + text + '</span>';
+    els.uiConn.textContent = text;
+  }
+
+  function fmtBytes(bytes) {
+    const units = ['B', 'KB', 'MB', 'GB'];
+    let u = 0;
+    let n = bytes;
+    while (n >= 1024 && u < units.length - 1) { n /= 1024; u++; }
+    return (u === 0 ? n : n.toFixed(1)) + ' ' + units[u];
+  }
+
+  function updateStats() {
+    els.uiSent.textContent = fmtBytes(sentBytes);
+    els.uiRecv.textContent = fmtBytes(receivedBytes);
+    const pct = totalToSend ? Math.min(100, Math.round(sentBytes / totalToSend * 100)) : 0;
+    els.bar.style.width = pct + '%';
+    els.progressText.textContent = pct + '%';
+    els.trafficText.textContent = fmtBytes(sentBytes) + ' / ' + fmtBytes(totalToSend);
+    els.btnSendText.disabled = !connected;
+    els.btnPick.disabled = !connected;
+    els.btnSendFiles.disabled = !connected || selectedFiles.length === 0;
+    els.btnCopyOffer.disabled = !els.roomCode.value.trim();
+  }
+
+  function cleanup() {
+    if (dc) { try { dc.close(); } catch {} }
+    if (pc) { try { pc.close(); } catch {} }
+    dc = null;
+    pc = null;
+    connected = false;
+    transferQueue = [];
+    receiving = null;
+    pendingFiles = [];
+    selectedFiles = [];
+    totalToSend = 0;
+    totalToReceive = 0;
+    sentBytes = 0;
+    receivedBytes = 0;
+    els.fileList.innerHTML = '';
+    els.receivedList.innerHTML = '';
+    els.preview.innerHTML = '';
+    els.roomCode.value = '';
+    setStatus('warn', 'Комната не создана');
+    els.uiPeer.textContent = '—';
+    updateStats();
+    log('Сессия сброшена.');
+  }
+
+  function makePC() {
+    pc = new RTCPeerConnection({
+      iceServers: [
+        { urls: 'stun:stun.l.google.com:19302' },
+        { urls: 'stun:stun1.l.google.com:19302' }
+      ]
+    });
+
+    pc.onconnectionstatechange = () => {
+      const s = pc.connectionState;
+      if (s === 'connected') { connected = true; setStatus('ok', 'Подключено'); els.uiPeer.textContent = 'Онлайн'; log('Подключение установлено.'); }
+      else if (s === 'connecting' || s === 'new') setStatus('warn', 'Подключение...');
+      else if (s === 'disconnected') setStatus('warn', 'Связь потеряна');
+      else if (s === 'failed') setStatus('bad', 'Ошибка соединения');
+      else if (s === 'closed') setStatus('bad', 'Соединение закрыто');
+      updateStats();
+    };
+
+    pc.ondatachannel = (e) => {
+      dc = e.channel;
+      wireChannel();
+      log('Канал данных получен.');
+    };
+  }
+
+  function wireChannel() {
+    dc.binaryType = 'arraybuffer';
+    dc.onopen = () => {
+      connected = true;
+      setStatus('ok', 'Канал открыт');
+      log('DataChannel открыт.');
+      updateStats();
+    };
+    dc.onclose = () => {
+      connected = false;
+      setStatus('warn', 'Канал закрыт');
+      log('DataChannel закрыт.');
+      updateStats();
+    };
+    dc.onerror = () => log('Ошибка канала данных.');
+    dc.onmessage = async (evt) => {
+      if (typeof evt.data === 'string') {
+        const data = JSON.parse(evt.data);
+        if (data.type === 'text') {
+          addReceivedText(data.value);
+          receivedBytes += new Blob([data.value]).size;
+          updateStats();
+          return;
+        }
+        if (data.type === 'file-start') {
+          receiving = {
+            id: data.id,
+            name: data.name,
+            type: data.mime || 'application/octet-stream',
+            size: data.size,
+            chunks: [],
+            got: 0
+          };
+          totalToReceive += data.size;
+          log(`Получение файла: ${data.name}`);
+          return;
+        }
+        if (data.type === 'file-end') {
+          if (receiving && receiving.id === data.id) {
+            const blob = new Blob(receiving.chunks, { type: receiving.type });
+            activeBlobs.push(blob);
+            const url = URL.createObjectURL(blob);
+            addReceivedFile(receiving.name, receiving.size, url, receiving.type);
+            receivedBytes += receiving.got;
+            if (receiving.type.startsWith('image/')) showPreview('image', url);
+            if (receiving.type.startsWith('video/')) showPreview('video', url);
+            log(`Файл получен: ${receiving.name}`);
+            receiving = null;
+            updateStats();
+          }
+          return;
+        }
+        if (data.type === 'ping') {
+          dc.send(JSON.stringify({ type: 'pong', at: Date.now() }));
+          return;
+        }
+      } else {
+        if (!receiving) return;
+        const chunk = new Uint8Array(evt.data);
+        receiving.chunks.push(chunk);
+        receiving.got += chunk.byteLength;
+        receivedBytes += chunk.byteLength;
+        updateStats();
+      }
+    };
+  }
+
+  function showPreview(kind, url) {
+    els.preview.innerHTML = '';
+    if (kind === 'image') {
+      const img = document.createElement('img');
+      img.src = url;
+      els.preview.appendChild(img);
+    } else if (kind === 'video') {
+      const vid = document.createElement('video');
+      vid.src = url;
+      vid.controls = true;
+      els.preview.appendChild(vid);
+    }
+  }
+
+  function addReceivedText(text) {
+    const wrap = document.createElement('div');
+    wrap.className = 'item';
+    const left = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = 'Текст';
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = text.slice(0, 100) + (text.length > 100 ? '…' : '');
+    left.append(name, sub);
+
+    const actions = document.createElement('div');
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.textContent = 'Копировать';
+    btn.onclick = async () => {
+      await navigator.clipboard.writeText(text);
+      log('Текст скопирован.');
+    };
+    actions.appendChild(btn);
+    wrap.append(left, actions);
+    els.receivedList.prepend(wrap);
+  }
+
+  function addReceivedFile(name, size, url, mime) {
+    const wrap = document.createElement('div');
+    wrap.className = 'item';
+    const left = document.createElement('div');
+    const title = document.createElement('div');
+    title.className = 'name';
+    title.textContent = name;
+    const sub = document.createElement('div');
+    sub.className = 'sub';
+    sub.textContent = `${fmtBytes(size)} • ${mime || 'file'}`;
+    left.append(title, sub);
+
+    const actions = document.createElement('div');
+    const a = document.createElement('a');
+    a.className = 'btn';
+    a.href = url;
+    a.download = name;
+    a.textContent = 'Скачать';
+    a.target = '_blank';
+    actions.appendChild(a);
+    wrap.append(left, actions);
+    els.receivedList.prepend(wrap);
+  }
+
+  function renderSelectedFiles() {
+    els.fileList.innerHTML = '';
+    if (!selectedFiles.length) {
+      const empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.textContent = 'Файлы не выбраны.';
+      els.fileList.appendChild(empty);
+      return;
+    }
+    selectedFiles.forEach((file, idx) => {
+      const row = document.createElement('div');
+      row.className = 'item';
+      const left = document.createElement('div');
+      const title = document.createElement('div');
+      title.className = 'name';
+      title.textContent = file.name;
+      const sub = document.createElement('div');
+      sub.className = 'sub';
+      sub.textContent = `${fmtBytes(file.size)} • ${file.type || 'unknown'}`;
+      left.append(title, sub);
+
+      const right = document.createElement('div');
+      right.className = 'pill';
+      right.textContent = '#' + (idx + 1);
+      row.append(left, right);
+      els.fileList.appendChild(row);
+    });
+  }
+
+  function serializeDesc(desc) {
+    return btoa(unescape(encodeURIComponent(JSON.stringify({
+      type: desc.type,
+      sdp: desc.sdp
+    }))));
+  }
+
+  function deserializeDesc(code) {
+    return JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+  }
+
+  async function waitIceComplete() {
+    if (!pc) return;
+    if (pc.iceGatheringState === 'complete') return;
+    await new Promise(resolve => {
+      const fn = () => {
+        if (pc.iceGatheringState === 'complete') {
+          pc.removeEventListener('icegatheringstatechange', fn);
+          resolve();
+        }
+      };
+      pc.addEventListener('icegatheringstatechange', fn);
+    });
+  }
+
+  async function createRoom() {
+    cleanup();
+    makePC();
+    dc = pc.createDataChannel('shadowdrop');
+    wireChannel();
+
+    const offer = await pc.createOffer();
+    await pc.setLocalDescription(offer);
+    await waitIceComplete();
+    els.roomCode.value = serializeDesc(pc.localDescription);
+    els.btnCopyOffer.disabled = false;
+    setStatus('warn', 'Ожидает подключения');
+    log('Комната создана. Передай код второму устройству.');
+    updateStats();
+  }
+
+  async function connectRoom() {
+    try {
+      const code = els.roomCode.value.trim();
+      if (!code) return log('Сначала вставь код комнаты.');
+      if (!pc) makePC();
+      const offerOrAnswer = deserializeDesc(code);
+      if (offerOrAnswer.type === 'offer') {
+        await pc.setRemoteDescription(offerOrAnswer);
+        const answer = await pc.createAnswer();
+        await pc.setLocalDescription(answer);
+        await waitIceComplete();
+        els.roomCode.value = serializeDesc(pc.localDescription);
+        log('Ответ создан. Скопируй его назад на первое устройство.');
+        setStatus('warn', 'Ответ готов');
+      } else {
+        await pc.setRemoteDescription(offerOrAnswer);
+        log('Ответ принят. Подключение завершается.');
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus('bad', 'Не удалось подключиться');
+      log('Ошибка подключения: ' + err.message);
+    }
+  }
+
+  async function sendText() {
+    const text = els.textBox.value;
+    if (!text.trim()) return log('Пустой текст отправлять бессмысленно.');
+    if (!dc || dc.readyState !== 'open') return log('Сначала подключи канал.');
+    const payload = JSON.stringify({ type: 'text', value: text });
+    totalToSend += new Blob([text]).size;
+    dc.send(payload);
+    sentBytes += new Blob([text]).size;
+    log('Текст отправлен.');
+    updateStats();
+  }
+
+  async function sendFiles(files) {
+    if (!dc || dc.readyState !== 'open') return log('Сначала подключи канал.');
+    const list = [...files];
+    if (!list.length) return;
+    selectedFiles = list;
+    renderSelectedFiles();
+    transferQueue = list.slice();
+    totalToSend += list.reduce((a, f) => a + f.size, 0);
+    const CHUNK = 16 * 1024;
+    for (const file of list) {
+      const id = crypto.randomUUID();
+      dc.send(JSON.stringify({
+        type: 'file-start',
+        id,
+        name: file.name,
+        size: file.size,
+        mime: file.type || 'application/octet-stream'
+      }));
+      log(`Отправка файла: ${file.name}`);
+      let offset = 0;
+      while (offset < file.size) {
+        const slice = file.slice(offset, offset + CHUNK);
+        const buf = await slice.arrayBuffer();
+        dc.send(buf);
+        offset += buf.byteLength;
+        sentBytes += buf.byteLength;
+        updateStats();
+        if (dc.bufferedAmount > 8 * 1024 * 1024) {
+          await new Promise(r => setTimeout(r, 20));
+        }
+      }
+      dc.send(JSON.stringify({ type: 'file-end', id }));
+    }
+    log('Все файлы отправлены.');
+  }
+
+  async function copyOffer() {
+    const code = els.roomCode.value.trim();
+    if (!code) return;
+    await navigator.clipboard.writeText(code);
+    log('Код комнаты скопирован.');
+  }
+
+  function addFileSelection(files) {
+    selectedFiles = [...files];
+    renderSelectedFiles();
+    updateStats();
+  }
+
+  els.btnCreate.onclick = createRoom;
+  els.btnConnect.onclick = connectRoom;
+  els.btnReset.onclick = cleanup;
+  els.btnCopyOffer.onclick = copyOffer;
+  els.btnPaste.onclick = async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) els.roomCode.value = t;
+      log('Текст вставлен из буфера.');
+      updateStats();
+    } catch {
+      log('Браузер запретил чтение буфера обмена.');
+    }
+  };
+  els.btnClearCode.onclick = () => {
+    els.roomCode.value = '';
+    updateStats();
+  };
+  els.btnSendText.onclick = sendText;
+  els.btnCopyText.onclick = async () => {
+    await navigator.clipboard.writeText(els.textBox.value || '');
+    log('Текст скопирован в буфер.');
+  };
+  els.btnPick.onclick = () => els.filePick.click();
+  els.btnSendFiles.onclick = () => sendFiles(selectedFiles);
+  els.filePick.onchange = () => addFileSelection(els.filePick.files);
+
+  els.dropZone.addEventListener('dragover', e => { e.preventDefault(); els.dropZone.classList.add('drag'); });
+  els.dropZone.addEventListener('dragleave', () => els.dropZone.classList.remove('drag'));
+  els.dropZone.addEventListener('drop', e => {
+    e.preventDefault();
+    els.dropZone.classList.remove('drag');
+    if (e.dataTransfer.files && e.dataTransfer.files.length) {
+      addFileSelection(e.dataTransfer.files);
+    }
+  });
+
+  els.mode.onchange = () => {
+    currentMode = els.mode.value;
+    if (currentMode === 'text') {
+      els.textBox.placeholder = 'Вставь текст, код, ссылки, заметки...';
+    } else if (currentMode === 'files') {
+      els.textBox.placeholder = 'Режим файлов. Текст можно не использовать.';
+    } else {
+      els.textBox.placeholder = 'Можно отправлять и текст, и файлы.';
+    }
+  };
+
+  updateStats();
+  renderSelectedFiles();
+  log('Готово. Создай комнату или вставь код.');
+})();
+</script>
+</body>
+</html>
